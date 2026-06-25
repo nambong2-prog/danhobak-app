@@ -243,12 +243,14 @@ function agg(){
  const cashIn=cash.filter(x=>x.type==='입금').reduce((s,x)=>s+(x.amt||0),0);
  const cashOut=cash.filter(x=>x.type==='지출').reduce((s,x)=>s+(x.amt||0),0);
  const balance=(DB.cashOpen||0)+cashIn-cashOut;
- const chs={};let chKg=0,chSale=0,chFee=0,chPay=0;
- CH.forEach(c=>{const a=DB.channels[c]||[];const kg=a.reduce((s,x)=>s+x.kg,0);
-   const sale=a.reduce((s,x)=>s+x.gross,0);const fee=a.reduce((s,x)=>s+(x.fee||0),0);
-   const pay=a.reduce((s,x)=>s+(x.payout!=null?x.payout:0),0);
-   chs[c]={cnt:a.length,kg,conte:kg/KGU,sale,fee,pay,hasFee:a.some(x=>x.fee!=null)};
-   chKg+=kg;chSale+=sale;chFee+=fee;chPay+=pay;});
+ const chs={};let chKg=0,chSale=0,chFee=0,chPay=0,chPendAmt=0,chPendCnt=0;
+ CH.forEach(c=>{const arr=DB.channels[c]||[];const kg=arr.reduce((s,x)=>s+x.kg,0);
+   const conf=arr.filter(x=>x.fee!=null);const pend=arr.filter(x=>x.fee==null);
+   const sale=conf.reduce((s,x)=>s+x.gross,0);const fee=conf.reduce((s,x)=>s+(x.fee||0),0);
+   const pay=conf.reduce((s,x)=>s+(x.payout!=null?x.payout:0),0);
+   const pendAmt=pend.reduce((s,x)=>s+x.gross,0),pendKg=pend.reduce((s,x)=>s+x.kg,0);
+   chs[c]={cnt:arr.length,kg,conte:kg/KGU,sale,fee,pay,hasFee:conf.length>0,pendCnt:pend.length,pendAmt,pendKg};
+   chKg+=kg;chSale+=sale;chFee+=fee;chPay+=pay;chPendAmt+=pendAmt;chPendCnt+=pend.length;});
  const outKg=gpKg+baljuKg+chKg, outConte=outKg/KGU;
  const stockConte=ipgoConte-outConte, stockKg=stockConte*KGU;
  const avgKg=ipgoKg?ipgoCost/ipgoKg:0;
@@ -256,7 +258,7 @@ function agg(){
  const rev=gpNet+baljuSale+chSale;
  const cogs=ipgoCost-stockAsset;
  const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
- return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,
+ return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,chPendAmt,chPendCnt,
    outKg,outConte,stockConte,stockKg,avgKg,stockAsset,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
    profit:rev-cogs};
 }
@@ -293,11 +295,11 @@ function vDash(){const a=agg();
  <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
  <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>-</td><td>${W(a.gpNet)}</td></tr>
  <tr><td class="l">발주방</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
- ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.cnt&&!s.hasFee?'<span class="tag warn">수수료 별도</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
+ ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.pendCnt?'<span class="tag warn">정산대기 '+s.pendCnt+'건</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
  <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr>
  </tbody></table>
  <p class="mut">발주방: 입금완료 ${a.cPaid}건·${W(a.baljuPaidSale)}원 · <b style="color:#c0392b">미수 ${a.cMisu}건·${W(a.baljuMisu)}원</b> · 서비스(무료) ${a.cSvc}건·${W(a.baljuServiceKg)}kg(정가 ${W(a.baljuService)}원). 발주방 매출은 <b>실제 입금액 ${W(a.baljuDeposit)}원</b> 기준입니다.</p>
- <p class="mut">※ 쿠팡·토스 발주파일은 최종 수수료가 없어 '수수료 별도'로 표시됩니다. 정산서를 올리면 자동 반영됩니다.</p></div>`;
+ <p class="mut">※ 주문만 들어온 채널(쿠팡·토스 등)은 정산 전이라 <b>'정산대기'</b>로 매출에 미반영됩니다(현재 정산대기 ${a.chPendCnt}건·주문액 ${W(a.chPendAmt)}원). 정산서를 올리면 매출로 확정돼요.</p></div>`;
 }
 const kpi=(l,v,u)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="u">${u}</div></div>`;
 
@@ -367,7 +369,7 @@ function vChannels(){
   ${a.map(x=>`<tr><td class="l">${(x.date||'').toString().slice(0,10)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
   </tbody></table></div>`
    : `<p class="mut" style="margin:6px 0">${a.length}건 줄임 — 펼치기를 누르면 주문 상세가 표시됩니다.</p>`;
-  html+=`<div class="card"><h2>${c} <span class="pill">${a.length}건</span>${hasFee?'':'<span class="tag warn">수수료 별도정산</span>'}</h2>
+  html+=`<div class="card"><h2>${c} <span class="pill">${a.length}건</span>${hasFee?'':'<span class="tag warn">정산대기 · 정산서 올리면 매출 확정</span>'}</h2>
   <h3>규격별 요약</h3>${optTable(optAgg(a),hasFee)}
   <div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"><h3 style="margin:0">주문 상세</h3><button class="btn alt" style="padding:5px 12px" onclick="toggle('${k}')">${caret(k)}</button></div>
   ${detail}</div>`;});
@@ -589,7 +591,7 @@ function vInvestor(){const a=agg();
   <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>비중</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
   <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>${(a.gpNet/rev*100).toFixed(1)}%</td><td>-</td><td>${W(a.gpNet)}</td></tr>
   <tr><td class="l">발주방</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>${(a.baljuSale/rev*100).toFixed(1)}%</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
-  ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.cnt&&!s.hasFee?'<span class="tag warn">수수료 별도</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${(s.sale/rev*100).toFixed(1)}%</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`;}).join('')}
+  ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.pendCnt?'<span class="tag warn">정산대기 '+s.pendCnt+'건</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${(s.sale/rev*100).toFixed(1)}%</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`;}).join('')}
   <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>100%</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr></tbody></table>
 
   <h2>2. 손익계산서 (요약)</h2>

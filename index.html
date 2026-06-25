@@ -301,7 +301,7 @@ function vUpload(){return `<div class="card"><h2>파일 업로드 <span class="p
  <div class="row" style="margin-top:12px"><button class="btn alt" onclick="exportXlsx()">⬇ 통합 엑셀 내보내기(백업)</button>
  <button class="btn warn" onclick="reset()">초기화</button></div>
  <h3>처리 로그</h3><div id="log" class="log"><div class="mut">대기 중…</div></div>
- <div class="note" style="margin-top:12px">파일을 올리면 <b>기존 자료에 누적</b>됩니다. 같은 주문은 <b>중복 자동 제거</b>되니, 일주일·한 달에 한 번씩 올려도 이전 자료가 사라지지 않아요. (항상 그 채널의 전체 파일을 올리세요.)</div>
+ <div class="note" style="margin-top:12px"><b>쿠팡·스마트스토어·토스·톡스토어</b>는 올릴 때마다 <b>누적</b>(같은 주문 중복 자동제거)됩니다. <b>발주방</b>은 올린 CSV로 <b>전체 교체</b>되니, 항상 시트에서 받은 <b>전체 발주방 CSV</b>를 올리세요(빠진 건 사라지고 추가·변경분이 그대로 반영).</div>
  </div>`;}
 
 function bindDrop(){
@@ -325,7 +325,7 @@ function ingest(name,buf){
  const {channel,hrow}=det;
  if(channel==='입고'){const inc=parseIpgo(rows,hrow);const r=mergeRecords(DB.ipgo||[],inc,function(x){return [x.date,x.farm,x.conte,x.priceKg].join('|');});DB.ipgo=r.merged;save();logln('✅ <b>입고</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+DB.ipgo.length+'건');render();go('업로드');return;}
  if(channel==='입금'){const inc=parseIpgeum(rows,hrow).map(function(x){return {date:x.date,type:'입금',cat:'입금(업로드)',memo:x.who,amt:x.amt,src:'up'};});const existUp=(DB.cash||[]).filter(function(x){return x.src==='up';});const r=mergeRecords(existUp,inc,function(x){return [x.date,x.memo,x.amt].join('|');});DB.cash=(DB.cash||[]).filter(function(x){return x.src!=='up';}).concat(r.merged);save();logln('✅ <b>입금 업로드</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+r.merged.length+'건');render();return;}
- if(channel==='발주방'){const inc=normalize('발주방',rows,hrow);const keyFn=function(x){return [x.date,x.order,x.opt,x.gross].join('|');};const map=new Map();(DB.balju||[]).forEach(function(x){map.set(keyFn(x),x);});var added=0,dup=0;const newOnes=[];inc.forEach(function(x){const k=keyFn(x);if(map.has(k)){dup++;}else{added++;newOnes.push(x);map.set(k,x);}});classifyBalju(newOnes);DB.balju=Array.from(map.values());save();logln('✅ <b>발주방</b> ('+name+') · 새 '+added+'건 추가, 중복 '+dup+'건 제외 → 누적 '+DB.balju.length+'건');render();return;}
+ if(channel==='발주방'){const a=classifyBalju(normalize('발주방',rows,hrow));DB.balju=a;save();const c={입금완료:0,서비스:0,미수:0};a.forEach(function(x){c[x.status]=(c[x.status]||0)+1;});logln('✅ <b>발주방</b> ('+name+') · 전체 교체 '+a.length+'건 (입금완료 '+c.입금완료+'/서비스 '+c.서비스+'/미수 '+c.미수+')');render();return;}
  const inc=normalize(channel,rows,hrow);const r=mergeRecords(DB.channels[channel]||[],inc,function(x){return (x.order||'')+'||'+(x.opt||'');});DB.channels[channel]=r.merged;save();const kg=r.merged.reduce(function(s,x){return s+x.kg;},0);const sale=r.merged.reduce(function(s,x){return s+x.gross;},0);logln('✅ <b>'+channel+'</b> ('+name+') · 새 '+r.added+'건 추가, 갱신 '+r.updated+'건 → 누적 '+r.merged.length+'건 · '+W(kg)+'kg · 매출 '+W(sale)+'원');
 }
 

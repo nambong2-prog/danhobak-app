@@ -269,7 +269,7 @@ const caret=k=>UI.open[k]?'▼ 줄이기':'▶ 펼치기';
 const editMode=k=>!!UI.edit[k];
 function toggleEdit(k){UI.edit[k]=!UI.edit[k];render();}
 const editBtn=k=>`<button class="btn ${UI.edit[k]?'':'alt'}" style="padding:5px 12px" onclick="toggleEdit('${k}')">${UI.edit[k]?'✓ 완료':'✏ 수정'}</button>`;
-const TABS=['대시보드','업로드','채널 정산','입고·매입','공판','자금현황','재고','손익','사업요약','동기화'];
+const TABS=['대시보드','채널 정산','공판','입고·매입','재고','자금현황','손익','사업요약','업로드','동기화'];
 function render(){
  const stat=ghReady()?`<button onclick="go('동기화')" style="background:#1f7a3a;color:#fff" title="GitHub 연결됨">🟢 연결</button>`:`<button onclick="go('동기화')" title="로컬 전용">⚪ 로컬</button>`;
  document.getElementById('nav').innerHTML=stat+TABS.map(t=>`<button class="${t===TAB?'on':''}" onclick="go('${t}')">${t}</button>`).join('');

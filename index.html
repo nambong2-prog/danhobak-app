@@ -78,6 +78,7 @@ const N=v=>{if(v==null||v==='')return 0;const n=parseFloat(String(v).replace(/[,
 const CH=['쿠팡','스마트스토어','토스','톡스토어'];
 const SIG={ // 채널 자동인식용 시그니처 헤더
  쿠팡:['묶음배송번호','결제액'],
+ 쿠팡정산:['판매수수료','정산금액'],
  스마트스토어:['상품주문번호','정산예정금액'],
  토스:['주문상품번호','받은 혜택'],
  토스정산:['수수료 합계','정산금액'],
@@ -136,7 +137,8 @@ function normalize(channel, rows, hrow){
       const settle=N(get(row,['정산기준금액']));
       rec.fee=Math.abs(N(get(row,['기본수수료']))+N(get(row,['노출추가수수료']))+N(get(row,['추천리워드수수료']))-N(get(row,['수수료할인금액'])));
       rec.payout=settle-rec.fee; rec.settle=settle;
-    }else if(channel==='발주방'){
+    }else if(channel==='쿠팡정산'){const recs=parseCoupangSettle(rows,hrow);const cp=DB.channels['쿠팡']||[];const idx={};cp.forEach((x,i)=>{(idx[String(x.order)]=idx[String(x.order)]||[]).push(i);});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.order)];if(arr){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['쿠팡']=cp;save();logln('✅ <b>쿠팡 정산 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
+ if(channel==='발주방'){
       rec.channel='발주방';
       rec.date=get(row,['주문일시']); rec.order=get(row,['받는 사람 이름']);
       rec.payer=String(get(row,['입금자(주문자)','입금자'])||'').trim();
@@ -176,6 +178,13 @@ function parseIpgeum(rows,hrow){const m=colmap(rows[hrow]);const out=[];
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
     const amt=N(row[pick(m,['입금액','금액'])]); if(!amt)continue;
     out.push({date:row[pick(m,['입금일','일자'])]||'',who:row[pick(m,['입금자'])]||'',amt});}
+  return out;}
+
+function parseCoupangSettle(rows,hrow){const m=colmap(rows[hrow]);const out=[];
+  for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
+    const order=String(row[pick(m,['주문번호'])]||'');if(!order)continue;
+    const optId=String(row[pick(m,['옵션 ID'])]||'');if(optId.charAt(0)==='<')continue;
+    out.push({order,amt:N(row[pick(m,['판매액'])]),fee:N(row[pick(m,['판매수수료'])]),settle:N(row[pick(m,['정산금액'])]),qty:N(row[pick(m,['판매수량'])])||1});}
   return out;}
 
 /* ---------- 저장소 ---------- */

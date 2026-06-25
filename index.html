@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>돌망돌망 단호박 통합관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--g:#2E5E3A;--g2:#3f7d4e;--lg:#e9f3ea;--ink:#1f2a22;--mut:#7a8a7e;--bd:#dfe7e0;--warn:#c0392b;--in:#fff6d6}
+*{box-sizing:border-box}
+body{margin:0;font-family:"맑은 고딕","Malgun Gothic",-apple-system,system-ui,sans-serif;color:var(--ink);background:#f5f8f5}
+header{background:var(--g);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:700}
+header .sub{font-size:12px;opacity:.85}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav button{background:rgba(255,255,255,.12);color:#fff;border:0;padding:8px 13px;border-radius:8px;cursor:pointer;font-size:13px}
+nav button.on{background:#fff;color:var(--g);font-weight:700}
+.wrap{max-width:1180px;margin:0 auto;padding:18px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+h2{font-size:15px;margin:0 0 12px;color:var(--g)}
+h3{font-size:13px;margin:18px 0 8px;color:var(--g2)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--lg);border-radius:10px;padding:13px 15px}
+.kpi .l{font-size:12px;color:var(--mut)}
+.kpi .v{font-size:21px;font-weight:800;margin-top:3px}
+.kpi .u{font-size:12px;color:var(--mut);font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid var(--bd);padding:7px 9px;text-align:right}
+th{background:var(--g);color:#fff;font-weight:600;text-align:center;position:sticky;top:0}
+td.l,th.l{text-align:left}
+tbody tr:nth-child(even){background:#fafcfa}
+.tot{font-weight:800;background:var(--lg)!important}
+.drop{border:2px dashed var(--g2);border-radius:12px;padding:28px;text-align:center;color:var(--mut);background:#fbfdfb;cursor:pointer}
+.drop.hot{background:var(--lg);border-color:var(--g)}
+.btn{background:var(--g);color:#fff;border:0;padding:9px 15px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn.alt{background:#fff;color:var(--g);border:1px solid var(--g)}
+.btn.warn{background:#fff;color:var(--warn);border:1px solid var(--warn)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.tag.ok{background:#e3f2e6;color:var(--g)}
+.tag.warn{background:#fdeaea;color:var(--warn)}
+.mut{color:var(--mut);font-size:12px}
+.log{font-size:12px;max-height:160px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:8px;background:#fafafa}
+.log div{padding:2px 0;border-bottom:1px dashed #eee}
+input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font-size:13px;width:110px}
+.scroll{overflow:auto;max-height:62vh}
+.pill{font-size:11px;padding:2px 7px;border-radius:6px;background:#eef4ef;color:var(--g2);margin-left:6px}
+.hide{display:none}
+.note{background:var(--in);border:1px solid #ecd98a;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎃 돌망돌망 단호박 통합관리</h1>
+  <span class="sub">콘테나 19kg 기준 · 브라우저 저장 · 채널 자동인식</span>
+  <nav id="nav"></nav>
+</header>
+<div class="wrap" id="app"></div>
+
+<script>
+const KGU=19, FONT_OK="ok";
+const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
+const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
+const $=h=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
+
+/* ---------- 규격 파서 ---------- */
+function parseKg(txt){
+  if(!txt) return {boxKg:0,mult:1};
+  const s=String(txt);
+  const m=s.match(/(\d+(?:\.\d+)?)\s*kg/i);
+  const mm=s.match(/(?:\*|x|×)\s*(\d+)\b/i);
+  return {boxKg:m?parseFloat(m[1]):0, mult:mm?parseInt(mm[1]):1};
+}
+const N=v=>{if(v==null||v==='')return 0;const n=parseFloat(String(v).replace(/[, ]/g,''));return isNaN(n)?0:n};
+
+/* ---------- 채널 설정 ---------- */
+const CH=['쿠팡','스마트스토어','토스','톡스토어'];
+const SIG={ // 채널 자동인식용 시그니처 헤더
+ 쿠팡:['묶음배송번호','결제액'],
+ 스마트스토어:['상품주문번호','정산예정금액'],
+ 토스:['주문상품번호','받은 혜택'],
+ 토스정산:['수수료 합계','정산금액'],
+ 톡스토어:['정산기준금액','판매자쿠폰할인금액'],
+ 발주방:['받는 사람 이름','옵션 이름'],
+ 입고:['농가','콘테나'],
+ 입금:['입금자','입금액']
+};
+function colmap(hdr){const m={};hdr.forEach((h,i)=>{if(h!=null&&h!=='')m[String(h).trim()]=i});return m}
+const pick=(m,names)=>{for(const n of names)if(n in m)return m[n];return -1};
+
+function detect(hdrRows){
+  // hdrRows: 첫 6행 배열. 시그니처 매칭되는 헤더행 탐색
+  for(let i=0;i<hdrRows.length;i++){
+    const set=new Set(hdrRows[i].filter(x=>x!=null&&x!=='').map(x=>String(x).trim()));
+    for(const ch in SIG){ if(SIG[ch].every(s=>set.has(s))) return {channel: ch==='토스정산'?'토스':ch, hrow:i}; }
+  }
+  return null;
+}
+
+/* ---------- 채널별 정규화 ---------- */
+function normalize(channel, rows, hrow){
+  const hdr=rows[hrow], m=colmap(hdr); const out=[];
+  const get=(r,names)=>{const i=pick(m,names);return i<0?'':r[i]};
+  for(let r=hrow+1;r<rows.length;r++){
+    const row=rows[r]; if(!row||row.every(c=>c==null||c===''))continue;
+    const c0=String(row[0]||'');
+    if(c0.startsWith('수정 ')||c0.startsWith('◈')||c0.startsWith('📍'))continue; // 안내/주석행
+    let rec={channel};
+    if(channel==='쿠팡'){
+      rec.date=get(row,['출고일(발송일)','주문일']); rec.order=get(row,['주문번호']);
+      rec.opt=get(row,['등록옵션명','노출상품명(옵션명)']); rec.qty=N(get(row,['구매수(수량)']))||1;
+      rec.gross=N(get(row,['결제액'])); rec.disc=0; rec.fee=null; rec.payout=null; rec.feeNote='별도정산서';
+    }else if(channel==='스마트스토어'){
+      rec.date=get(row,['발송일','결제일']); rec.order=get(row,['주문번호']);
+      rec.opt=get(row,['옵션정보','상품명']); rec.qty=N(get(row,['수량']))||1;
+      rec.gross=N(get(row,['최종 상품별 총 주문금액','상품가격'])); rec.disc=N(get(row,['최종 상품별 할인액']));
+      rec.fee=Math.abs(N(get(row,['네이버페이 주문관리 수수료']))+N(get(row,['매출연동 수수료'])));
+      rec.payout=N(get(row,['정산예정금액']));
+    }else if(channel==='토스'){
+      rec.date=get(row,['결제일시','주문일시']); rec.order=get(row,['주문번호']);
+      rec.opt=get(row,['옵션명']); rec.qty=N(get(row,['주문수량','주문건수']))||1;
+      if(pick(m,['수수료 합계'])>=0){ // 토스 정산내역
+        if(!rec.opt||String(get(row,['상품명'])).trim()==='배송비')continue; // 배송비 행 제외
+        rec.gross=N(get(row,['판매가격','주문금액 합계']));
+        rec.disc=Math.abs(N(get(row,['쿠폰 할인 부담금','셀러 부담 쿠폰 할인 금액'])));
+        rec.fee=Math.abs(N(get(row,['수수료 합계'])));
+        rec.payout=N(get(row,['정산금액']));
+      }else{ // 토스 주문 export(수수료 별도)
+        rec.gross=N(get(row,['주문금액'])); rec.disc=0; rec.fee=null; rec.payout=null; rec.feeNote='별도정산서';
+      }
+    }else if(channel==='톡스토어'){
+      rec.date=get(row,['발송요청일','주문일']); rec.order=get(row,['주문번호']);
+      rec.opt=get(row,['옵션']); rec.qty=N(get(row,['수량']))||1;
+      rec.gross=N(get(row,['상품금액'])); rec.disc=N(get(row,['판매자할인금액']))+N(get(row,['판매자쿠폰할인금액']));
+      const settle=N(get(row,['정산기준금액']));
+      rec.fee=Math.abs(N(get(row,['기본수수료']))+N(get(row,['노출추가수수료']))+N(get(row,['추천리워드수수료']))-N(get(row,['수수료할인금액'])));
+      rec.payout=settle-rec.fee; rec.settle=settle;
+    }else if(channel==='발주방'){
+      rec.channel='공구·직판';
+      rec.date=get(row,['주문일시']); rec.order=get(row,['받는 사람 이름']);
+      rec.payer=String(get(row,['입금자(주문자)','입금자'])||'').trim();
+      rec.opt=get(row,['옵션 이름']); rec.qty=N(get(row,['상품 수량']))||1;
+      rec.gross=N(get(row,['주문금액'])); rec.depRaw=String(get(row,['입금액'])||'').trim();
+      rec.disc=0; rec.fee=0; rec.payout=rec.gross;
+      if(!rec.opt&&!rec.gross&&!rec.payer)continue;
+    }else if(channel==='입고'){
+      const conte=N(get(row,['콘테나','콘테나(개)','수량'])); if(!conte)continue;
+      return null; // 입고는 별도 처리
+    }
+    const pk=parseKg(rec.opt); rec.boxKg=pk.boxKg; rec.kg=pk.boxKg*rec.qty*pk.mult; rec.conte=rec.kg/KGU;
+    out.push(rec);
+  }
+  return out;
+}
+
+/* ---------- 발주방 입금자 그룹 분류 (입금완료/서비스/미수) ---------- */
+function classifyBalju(recs){
+ const grp={};recs.forEach((x,i)=>{const k=x.payer?('P:'+x.payer):('R:'+i);(grp[k]=grp[k]||[]).push(i);});
+ Object.values(grp).forEach(idxs=>{
+  const hasPay=idxs.some(i=>{const d=recs[i].depRaw||'';return d&&d!=='미수'&&N(d)>0;});
+  const hasMisu=idxs.some(i=>recs[i].depRaw==='미수');
+  idxs.forEach(i=>{recs[i].status=hasPay?'입금완료':(hasMisu?'미수':'서비스');recs[i].payout=recs[i].status==='서비스'?0:recs[i].gross;});
+ });
+ return recs;
+}
+
+/* ---------- 입고/입금 파서 ---------- */
+function parseIpgo(rows,hrow){const m=colmap(rows[hrow]);const out=[];
+  for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
+    const farm=row[pick(m,['농가'])]; const conte=N(row[pick(m,['콘테나','콘테나(개)'])]);
+    if(!conte)continue;
+    out.push({date:row[pick(m,['입고일','일자'])]||'',farm:farm||'',conte,priceKg:N(row[pick(m,['매입단가(원/kg)','단가'])])||1600});}
+  return out;}
+function parseIpgeum(rows,hrow){const m=colmap(rows[hrow]);const out=[];
+  for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
+    const amt=N(row[pick(m,['입금액','금액'])]); if(!amt)continue;
+    out.push({date:row[pick(m,['입금일','일자'])]||'',who:row[pick(m,['입금자'])]||'',amt});}
+  return out;}
+
+/* ---------- 저장소 ---------- */
+const KEY='dmnho_v7';
+/* ---------- GitHub 동기화 ---------- */
+let GH=JSON.parse(localStorage.getItem('dmnho_gh')||'{}');
+function ghSaveCfg(){localStorage.setItem('dmnho_gh',JSON.stringify(GH));}
+function setGH(f,v){GH[f]=v;ghSaveCfg();}
+const b64enc=s=>btoa(unescape(encodeURIComponent(s)));
+const b64dec=b=>decodeURIComponent(escape(atob(b)));
+const ghHdr=()=>({Authorization:'Bearer '+GH.token,Accept:'application/vnd.github+json','Content-Type':'application/json'});
+const ghUrl=()=>`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURIComponent(GH.path||'data.json').replace(/%2F/g,'/')}`;
+function ghStatus(m){const el=document.getElementById('ghst');if(el)el.textContent=m;}
+function ghReady(){return GH.owner&&GH.repo&&GH.token;}
+async function ghGetSha(){const r=await fetch(ghUrl()+`?ref=${GH.branch||'main'}&t=`+Date.now(),{headers:ghHdr()});if(r.status===200){return (await r.json()).sha;}return null;}
+async function ghPush(){if(!ghReady()){ghStatus('⚠️ 아이디·저장소·토큰을 먼저 입력하세요.');return;}
+ try{ghStatus('저장 중…');const sha=await ghGetSha();
+  const body={message:'update '+new Date().toISOString(),content:b64enc(JSON.stringify(DB)),branch:GH.branch||'main'};if(sha)body.sha=sha;
+  const r=await fetch(ghUrl(),{method:'PUT',headers:ghHdr(),body:JSON.stringify(body)});
+  if(r.ok)ghStatus('✅ GitHub 저장 완료 · '+new Date().toLocaleString());
+  else{const e=await r.json();ghStatus('❌ 저장 실패: '+(e.message||r.status));}}catch(e){ghStatus('❌ '+e.message+' (file:// 이면 Pages 주소로 여세요)');}}
+async function ghPull(){if(!ghReady()){ghStatus('⚠️ 아이디·저장소·토큰을 먼저 입력하세요.');return;}
+ try{ghStatus('불러오는 중…');const r=await fetch(ghUrl()+`?ref=${GH.branch||'main'}&t=`+Date.now(),{headers:ghHdr()});
+  if(r.status===404){ghStatus('⚠️ 파일이 없습니다. [GitHub에 저장]을 먼저 누르세요.');return;}
+  if(!r.ok){const e=await r.json();ghStatus('❌ 불러오기 실패: '+(e.message||r.status));return;}
+  const j=await r.json();_ghLoading=true;DB=JSON.parse(b64dec(j.content.replace(/\n/g,'')));save();_ghLoading=false;render();ghStatus('✅ GitHub에서 불러왔습니다 · '+new Date().toLocaleString());}catch(e){ghStatus('❌ '+e.message);}}
+let _ghT=null,_ghLoading=false;
+function scheduleGhPush(){if(_ghLoading||!ghReady()||GH.auto===false)return;clearTimeout(_ghT);_ghT=setTimeout(ghPush,3000);}
+let DB;
+function load(){try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}
+  return seed();}
+function save(){localStorage.setItem(KEY,JSON.stringify(DB));scheduleGhPush();}
+function reset(){if(confirm('모든 데이터를 초기값으로 되돌릴까요?')){DB=seed();save();render();}}
+
+/* ---------- 초기 시드 (기존 엑셀과 동일) ---------- */
+function seed(){
+ return {ipgo:[],gongpan:[],gpCostKg:1600,jigeup:[],balju:[],channels:{쿠팡:[],스마트스토어:[],토스:[],톡스토어:[]},ipgeum:[],cash:[],cashOpen:0,seon:0.90};
+}
+// 발주방 시드: [날짜,받는분,주문금액,박스kg,박스수,상태]
+const BALJU_SEED=[];
+
+/* ---------- 집계 ---------- */
+function agg(){
+ const ipgoConte=DB.ipgo.reduce((s,x)=>s+x.conte,0);
+ const ipgoKg=ipgoConte*KGU;
+ const ipgoCost=DB.ipgo.reduce((s,x)=>s+x.conte*KGU*x.priceKg,0);
+ const cKg=DB.gpCostKg||1600;
+ let gpKg=0,gpNet=0,gpSettledKg=0;
+ DB.gongpan.forEach(x=>{const kg=(x.boxKg||0)*(x.boxes||0);gpKg+=kg;if(x.net!=null){gpNet+=x.net;gpSettledKg+=kg;}});
+ const gpCost=gpSettledKg*cKg, gpMargin=gpNet-gpCost, gpMrate=gpNet?gpMargin/gpNet:0;
+ const baljuKg=DB.balju.reduce((s,x)=>s+x.kg,0);
+ let baljuPaidSale=0,baljuMisu=0,baljuService=0,baljuServiceKg=0,cPaid=0,cMisu=0,cSvc=0;
+ DB.balju.forEach(x=>{const st=x.status||'입금완료';
+   if(st==='서비스'){baljuService+=x.gross;baljuServiceKg+=x.kg;cSvc++;}
+   else if(st==='미수'){baljuMisu+=x.gross;cMisu++;}
+   else {baljuPaidSale+=x.gross;cPaid++;}});
+ const baljuRev=baljuPaidSale+baljuMisu;const baljuSale=baljuRev;
+ const cash=DB.cash||[];
+ const cashIn=cash.filter(x=>x.type==='입금').reduce((s,x)=>s+(x.amt||0),0);
+ const cashOut=cash.filter(x=>x.type==='지출').reduce((s,x)=>s+(x.amt||0),0);
+ const balance=(DB.cashOpen||0)+cashIn-cashOut;
+ const chs={};let chKg=0,chSale=0,chFee=0,chPay=0;
+ CH.forEach(c=>{const a=DB.channels[c]||[];const kg=a.reduce((s,x)=>s+x.kg,0);
+   const sale=a.reduce((s,x)=>s+x.gross,0);const fee=a.reduce((s,x)=>s+(x.fee||0),0);
+   const pay=a.reduce((s,x)=>s+(x.payout!=null?x.payout:0),0);
+   chs[c]={cnt:a.length,kg,conte:kg/KGU,sale,fee,pay,hasFee:a.some(x=>x.fee!=null)};
+   chKg+=kg;chSale+=sale;chFee+=fee;chPay+=pay;});
+ const outKg=gpKg+baljuKg+chKg, outConte=outKg/KGU;
+ const stockConte=ipgoConte-outConte, stockKg=stockConte*KGU;
+ const avgKg=ipgoKg?ipgoCost/ipgoKg:0;
+ const stockAsset=stockKg*avgKg;
+ const rev=gpNet+baljuSale+chSale;
+ const cogs=ipgoCost-stockAsset;
+ const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
+ return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,
+   outKg,outConte,stockConte,stockKg,avgKg,stockAsset,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
+   profit:rev-cogs};
+}
+
+/* ---------- 라우팅/렌더 ---------- */
+let TAB='대시보드';
+let UI={open:{},edit:{}};
+function toggle(k){UI.open[k]=!UI.open[k];render();}
+const caret=k=>UI.open[k]?'▼ 줄이기':'▶ 펼치기';
+const editMode=k=>!!UI.edit[k];
+function toggleEdit(k){UI.edit[k]=!UI.edit[k];render();}
+const editBtn=k=>`<button class="btn ${UI.edit[k]?'':'alt'}" style="padding:5px 12px" onclick="toggleEdit('${k}')">${UI.edit[k]?'✓ 완료':'✏ 수정'}</button>`;
+const TABS=['대시보드','업로드','채널 정산','입고·매입','공판','자금현황','재고','손익','동기화'];
+function render(){
+ const stat=ghReady()?`<button onclick="go('동기화')" style="background:#1f7a3a;color:#fff" title="GitHub 연결됨">🟢 연결</button>`:`<button onclick="go('동기화')" title="로컬 전용">⚪ 로컬</button>`;
+ document.getElementById('nav').innerHTML=stat+TABS.map(t=>`<button class="${t===TAB?'on':''}" onclick="go('${t}')">${t}</button>`).join('');
+ document.getElementById('app').innerHTML=({
+   '대시보드':vDash,'업로드':vUpload,'채널 정산':vChannels,'입고·매입':vIpgo,'공판':vGongpan,'자금현황':vCash,'재고':vStock,'손익':vPnl,'동기화':vSync
+ })[TAB]();
+ if(TAB==='업로드')bindDrop();
+}
+function go(t){TAB=t;render();}
+
+function vDash(){const a=agg();
+ return `<div class="card"><h2>핵심 지표</h2><div class="kpis">
+  ${kpi('총 매입',W(a.ipgoConte),'콘테나')}
+  ${kpi('현재고',W1(a.stockConte),'콘테나 (≈'+W(a.stockKg)+'kg)')}
+  ${kpi('총 매출',W(a.rev),'원')}
+  ${kpi('총 수수료',W(a.chFee),'원')}
+  ${kpi('순이익(추정)',W(a.profit),'원')}
+  ${kpi('농가 미지급',W(a.mijigeup),'원')}
+ </div></div>
+ <div class="card"><h2>채널별 요약</h2>
+ <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
+ <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>-</td><td>${W(a.gpNet)}</td></tr>
+ <tr><td class="l">공구·직판(발주방)</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
+ ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.cnt&&!s.hasFee?'<span class="tag warn">수수료 별도</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
+ <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr>
+ </tbody></table>
+ <p class="mut">공구·직판: 입금완료 ${a.cPaid}건·${W(a.baljuPaidSale)}원 · <b style="color:#c0392b">미수 ${a.cMisu}건·${W(a.baljuMisu)}원</b> · 서비스(무료) ${a.cSvc}건·${W(a.baljuServiceKg)}kg(정가 ${W(a.baljuService)}원). 매출엔 입금완료+미수만 반영됩니다.</p>
+ <p class="mut">※ 쿠팡·토스 발주파일은 최종 수수료가 없어 '수수료 별도'로 표시됩니다. 정산서를 올리면 자동 반영됩니다.</p></div>`;
+}
+const kpi=(l,v,u)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="u">${u}</div></div>`;
+
+function vUpload(){return `<div class="card"><h2>파일 업로드 <span class="pill">채널 자동인식</span></h2>
+ <div id="drop" class="drop">📥 채널 정산/발주 엑셀(.xlsx)을 이곳에 끌어다 놓거나 클릭해서 선택<br>
+ <span class="mut">쿠팡 · 스마트스토어 · 토스 · 톡스토어 · 발주방 · 입고 · 입금내역 자동 구분</span>
+ <input id="file" type="file" accept=".xlsx,.xls,.csv" multiple class="hide"></div>
+ <div class="row" style="margin-top:12px"><button class="btn alt" onclick="exportXlsx()">⬇ 통합 엑셀 내보내기(백업)</button>
+ <button class="btn warn" onclick="reset()">초기화</button></div>
+ <h3>처리 로그</h3><div id="log" class="log"><div class="mut">대기 중…</div></div>
+ <div class="note" style="margin-top:12px">같은 채널을 다시 올리면 <b>해당 채널만 최신 파일로 교체</b>됩니다. 쿠폰·수수료가 바뀐 정산서를 다시 올리면 자동 갱신돼요.</div>
+ </div>`;}
+
+function bindDrop(){
+ const d=document.getElementById('drop'),f=document.getElementById('file');
+ d.onclick=()=>f.click();
+ d.ondragover=e=>{e.preventDefault();d.classList.add('hot')};
+ d.ondragleave=()=>d.classList.remove('hot');
+ d.ondrop=e=>{e.preventDefault();d.classList.remove('hot');handle(e.dataTransfer.files)};
+ f.onchange=e=>handle(e.target.files);
+}
+function logln(html){const l=document.getElementById('log');if(l.querySelector('.mut'))l.innerHTML='';l.insertAdjacentHTML('afterbegin','<div>'+html+'</div>');}
+function handle(files){[...files].forEach(file=>{const rd=new FileReader();
+ rd.onload=e=>{try{ingest(file.name,e.target.result)}catch(err){logln('❌ '+file.name+' : '+err.message)}};
+ rd.readAsArrayBuffer(file);});}
+function ingest(name,buf){
+ const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+ const det=detect(rows.slice(0,6));
+ if(!det){logln('⚠️ <b>'+name+'</b> : 채널을 인식하지 못했습니다. (헤더 확인 필요)');return;}
+ const {channel,hrow}=det;
+ if(channel==='입고'){const a=parseIpgo(rows,hrow);DB.ipgo=a;save();logln('✅ <b>입고</b> ('+name+') · '+a.length+'건 교체');render();go('업로드');return;}
+ if(channel==='입금'){const a=parseIpgeum(rows,hrow);DB.cash=(DB.cash||[]).filter(x=>x.src!=='up');a.forEach(x=>DB.cash.push({date:x.date,type:'입금',cat:'입금(업로드)',memo:x.who,amt:x.amt,src:'up'}));save();logln('✅ <b>입금 업로드</b> ('+name+') · '+a.length+'건 → 자금현황 반영');render();return;}
+ if(channel==='발주방'){const a=classifyBalju(normalize('발주방',rows,hrow));DB.balju=a;save();
+   const c={입금완료:0,서비스:0,미수:0};a.forEach(x=>c[x.status]=(c[x.status]||0)+1);
+   logln('✅ <b>발주방</b> ('+name+') · '+a.length+'건 (입금완료 '+c.입금완료+'/서비스 '+c.서비스+'/미수 '+c.미수+')');render();return;}
+ const a=normalize(channel,rows,hrow);DB.channels[channel]=a;save();
+ const kg=a.reduce((s,x)=>s+x.kg,0);const sale=a.reduce((s,x)=>s+x.gross,0);
+ logln('✅ <b>'+channel+'</b> ('+name+') · '+a.length+'건 · '+W(kg)+'kg · 매출 '+W(sale)+'원');
+}
+
+function optAgg(arr){const g={};arr.forEach(x=>{const k=x.boxKg||0;const o=g[k]=g[k]||{cnt:0,boxes:0,kg:0,sale:0,fee:0,pay:0,hasFee:false};
+  o.cnt++;o.boxes+=k?Math.round(x.kg/k):0;o.kg+=x.kg;o.sale+=x.gross;if(x.fee!=null){o.fee+=x.fee;o.hasFee=true;}o.pay+=(x.payout||0);});return g;}
+function optTable(g,showFee){const keys=Object.keys(g).map(Number).sort((a,b)=>a-b);
+ const T={cnt:0,boxes:0,kg:0,sale:0,fee:0,pay:0};keys.forEach(k=>{const o=g[k];T.cnt+=o.cnt;T.boxes+=o.boxes;T.kg+=o.kg;T.sale+=o.sale;T.fee+=o.fee;T.pay+=o.pay;});
+ return `<table><thead><tr><th class="l">규격</th><th>건수</th><th>박스수</th><th>중량(kg)</th><th>콘테나</th><th>매출(원)</th>${showFee?'<th>수수료</th><th>정산</th>':''}</tr></thead><tbody>
+ ${keys.map(k=>{const o=g[k];return `<tr><td class="l">${k?k+'kg':'기타'}</td><td>${W(o.cnt)}</td><td>${W(o.boxes)}</td><td>${W(o.kg)}</td><td>${W1(o.kg/KGU)}</td><td>${W(o.sale)}</td>${showFee?`<td>${o.hasFee?W(o.fee):'-'}</td><td>${o.hasFee?W(o.pay):'-'}</td>`:''}</tr>`}).join('')}
+ <tr class="tot"><td class="l">합계</td><td>${W(T.cnt)}</td><td>${W(T.boxes)}</td><td>${W(T.kg)}</td><td>${W1(T.kg/KGU)}</td><td>${W(T.sale)}</td>${showFee?`<td>${W(T.fee)}</td><td>${W(T.pay)}</td>`:''}</tr>
+ </tbody></table>`;}
+const ST_NEXT={입금완료:'미수',미수:'서비스',서비스:'입금완료'};
+const ST_COLOR={입금완료:'#2E5E3A',미수:'#c0392b',서비스:'#7a8a7e'};
+function cycleStatus(i){const x=DB.balju[i];x.status=ST_NEXT[x.status||'입금완료'];x.payout=(x.status==='서비스'?0:x.gross);save();render();}
+function setBalju(i,f,v){const x=DB.balju[i];if(f==='gross'){x.gross=N(v);x.payout=(x.status==='서비스'?0:x.gross);}else x[f]=v;save();render();}
+function delBalju(i){DB.balju.splice(i,1);save();render();}
+function cycleBaljuFilter(){const o=['전체','미수','서비스','입금완료'];UI.baljuF=o[(o.indexOf(UI.baljuF||'전체')+1)%o.length];render();}
+function addBalju(){DB.balju.push({channel:'공구·직판',date:'',order:'',opt:'',qty:1,boxKg:0,kg:0,conte:0,gross:0,disc:0,fee:0,payout:0,status:'입금완료'});save();render();}
+const stChip=(i,x)=>`<button onclick="cycleStatus(${i})" title="클릭하면 상태 변경" style="cursor:pointer;border:0;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;color:#fff;background:${ST_COLOR[x.status||'입금완료']}">${x.status||'입금완료'}</button>`;
+function vChannels(){
+ const a=agg();
+ const all=[...DB.balju,...CH.flatMap(c=>DB.channels[c]||[])];
+ let html=`<div class="card"><h2>규격별 판매 종합 <span class="pill">공구 + 온라인 전체</span></h2>${optTable(optAgg(all),false)}
+   <p class="mut">2kg·3kg·5kg·10kg 등 규격별로 몇 박스·얼마나 나갔는지 한눈에. (채널별 상세는 아래)</p></div>`;
+ const empty=[];
+ CH.forEach(c=>{const a=DB.channels[c]||[];
+  if(!a.length){empty.push(c);return;}
+  const hasFee=a.some(x=>x.fee!=null);
+  const k='ch_'+c;
+  const detail=UI.open[k]
+   ? `<div class="scroll"><table><thead><tr><th class="l">일자</th><th class="l">주문번호</th><th class="l">옵션</th><th>박스kg</th><th>수량</th><th>중량</th><th>콘테나</th><th>판매금</th><th>할인/쿠폰</th><th>수수료</th><th>정산</th></tr></thead><tbody>
+  ${a.map(x=>`<tr><td class="l">${(x.date||'').toString().slice(0,10)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
+  </tbody></table></div>`
+   : `<p class="mut" style="margin:6px 0">${a.length}건 줄임 — 펼치기를 누르면 주문 상세가 표시됩니다.</p>`;
+  html+=`<div class="card"><h2>${c} <span class="pill">${a.length}건</span>${hasFee?'':'<span class="tag warn">수수료 별도정산</span>'}</h2>
+  <h3>규격별 요약</h3>${optTable(optAgg(a),hasFee)}
+  <div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"><h3 style="margin:0">주문 상세</h3><button class="btn alt" style="padding:5px 12px" onclick="toggle('${k}')">${caret(k)}</button></div>
+  ${detail}</div>`;});
+ // 공구·직판 (발주방) — 상태 변경 가능
+ if(DB.balju.length){const edB=editMode('balju');const k='baljuD';const flt=UI.baljuF||'전체';
+  const filtered=DB.balju.map((x,i)=>({x,i})).filter(o=>flt==='전체'||(o.x.status||'입금완료')===flt);
+  const dRows=filtered.map(({x,i})=>edB?`<tr>
+    <td>${inp(x.date,`setBalju(${i},'date',this.value)`,80)}</td>
+    <td>${inp(x.order,`setBalju(${i},'order',this.value)`,90)}</td>
+    <td class="l">${x.opt||''}</td>
+    <td>${inn(x.gross,`setBalju(${i},'gross',this.value)`,90)}</td>
+    <td>${stChip(i,x)}</td>
+    <td><button class="btn warn" style="padding:3px 8px" onclick="delBalju(${i})">삭제</button></td></tr>`
+   :`<tr><td class="l">${(x.date||'').toString().slice(0,10)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${W(x.gross)}</td><td>${stChip(i,x)}</td><td></td></tr>`).join('');
+  const thStatus=`<th><button onclick="cycleBaljuFilter()" title="클릭: 상태별 보기" style="background:none;border:0;color:#fff;cursor:pointer;font:inherit;font-weight:600">상태 ${flt==='전체'?'▾':'('+flt+') ✕'}</button></th>`;
+  const detail=UI.open[k]
+   ? `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px"><span class="mut">${flt==='전체'?'전체':flt+'만'} ${filtered.length}건 표시</span>${editBtn('balju')}</div>
+      <div class="scroll"><table><thead><tr><th>일자</th><th>받는분</th><th class="l">옵션</th><th>주문금액</th>${thStatus}<th></th></tr></thead><tbody>${dRows||'<tr><td colspan=6 class="mut">해당 상태 주문이 없습니다.</td></tr>'}</tbody></table></div>
+      ${edB?`<button class="btn" style="margin-top:8px" onclick="addBalju()">＋ 주문 추가</button>`:''}`
+   : `<p class="mut" style="margin:6px 0">${DB.balju.length}건 줄임 — 펼치면 상태 헤더 클릭으로 미수만 골라볼 수 있습니다.</p>`;
+  html+=`<div class="card"><h2>공구·직판(발주방) <span class="pill">${DB.balju.length}건</span></h2>
+   <div class="kpis" style="margin-bottom:12px">${kpi('입금완료',W(a.baljuPaidSale),a.cPaid+'건')}${kpi('미수',W(a.baljuMisu),a.cMisu+'건')}${kpi('서비스(무료)',W(a.baljuServiceKg)+'kg',a.cSvc+'건·정가 '+W(a.baljuService)+'원')}</div>
+   <h3>규격별 요약 <span class="mut" style="font-weight:400">(서비스 포함 출고 기준)</span></h3>${optTable(optAgg(DB.balju),false)}
+   <div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"><h3 style="margin:0">주문별 상태 <span class="mut" style="font-weight:400">상태 칩 클릭 → 입금완료/미수/서비스 전환</span></h3><button class="btn alt" style="padding:5px 12px" onclick="toggle('${k}')">${caret(k)}</button></div>
+   ${detail}</div>`;}
+ if(empty.length)html+=`<div class="card"><p class="mut">아직 미업로드 채널: ${empty.join(', ')} — [업로드] 탭에서 정산/발주 파일을 올리면 규격별로 자동 분석됩니다.</p></div>`;
+ return html;
+}
+
+function setIpgo(i,f,v){DB.ipgo[i][f]=(f==='farm'||f==='date')?v:N(v);save();render();}
+function addIpgo(){DB.ipgo.push({date:'',farm:'현상수',conte:0,priceKg:1600});save();render();}
+function delIpgo(i){DB.ipgo.splice(i,1);save();render();}
+function setJig(i,f,v){DB.jigeup[i][f]=(f==='amt')?N(v):v;save();render();}
+function addJig(){DB.jigeup.push({date:'',farm:'현상수',amt:0});save();render();}
+function delJig(i){DB.jigeup.splice(i,1);save();render();}
+const fmtN=v=>(v==null||v==='')?'':Number(v).toLocaleString();
+function liveComma(el){let raw=el.value.replace(/[^\d.-]/g,'');if(raw===''||raw==='-'){el.value=raw;return;}const neg=raw[0]==='-'?'-':'';raw=raw.replace(/-/g,'');const p=raw.split('.');el.value=neg+Number(p[0]||'0').toLocaleString()+(p.length>1?'.'+p.slice(1).join(''):'');}
+const inp=(v,oc,w)=>`<input value="${v==null?'':v}" onchange="${oc}" style="width:${w}px">`;
+const inn=(v,oc,w)=>`<input type="text" inputmode="numeric" value="${fmtN(v)}" oninput="liveComma(this)" onchange="${oc}" style="width:${w}px;text-align:right">`;
+
+function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup');
+ const igRows=DB.ipgo.map((x,i)=>edI?`<tr>
+   <td>${inp(x.date,`setIpgo(${i},'date',this.value)`,68)}</td>
+   <td>${inp(x.farm,`setIpgo(${i},'farm',this.value)`,72)}</td>
+   <td>${inn(x.conte,`setIpgo(${i},'conte',this.value)`,72)}</td>
+   <td>${inn(x.priceKg,`setIpgo(${i},'priceKg',this.value)`,82)}</td>
+   <td>${W(x.conte*KGU)}</td><td>${W(x.conte*KGU*x.priceKg)}</td>
+   <td><button class="btn warn" style="padding:3px 8px" onclick="delIpgo(${i})">삭제</button></td></tr>`
+  :`<tr><td class="l">${x.date||''}</td><td class="l">${x.farm||''}</td><td>${W(x.conte)}</td><td>${W(x.priceKg)}</td><td>${W(x.conte*KGU)}</td><td>${W(x.conte*KGU*x.priceKg)}</td><td></td></tr>`).join('');
+ const byFarm={};DB.ipgo.forEach(x=>{const k=x.farm||'기타';(byFarm[k]=byFarm[k]||{c:0,cost:0});byFarm[k].c+=x.conte;byFarm[k].cost+=x.conte*KGU*x.priceKg;});
+ const paid={};DB.jigeup.forEach(x=>{const k=x.farm||'기타';paid[k]=(paid[k]||0)+x.amt;});
+ const farms=[...new Set([...Object.keys(byFarm),...Object.keys(paid)])];
+ const jigRows=DB.jigeup.map((x,i)=>edJ?`<tr>
+   <td>${inp(x.date,`setJig(${i},'date',this.value)`,80)}</td>
+   <td>${inp(x.farm,`setJig(${i},'farm',this.value)`,72)}</td>
+   <td>${inn(x.amt,`setJig(${i},'amt',this.value)`,120)}</td>
+   <td><button class="btn warn" style="padding:3px 8px" onclick="delJig(${i})">삭제</button></td></tr>`
+  :`<tr><td class="l">${x.date||''}</td><td class="l">${x.farm||''}</td><td>${W(x.amt)}</td><td></td></tr>`).join('');
+ const igHead=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">입고·매입 입력 <span class="pill">${DB.ipgo.length}건</span></h2><div class="row">${UI.open['ipgo']?editBtn('ipgo'):''}<button class="btn alt" style="padding:5px 12px" onclick="toggle('ipgo')">${caret('ipgo')}</button></div></div>`;
+ const igBody=UI.open['ipgo']
+  ? `<div class="scroll"><table><thead><tr><th>입고일</th><th>농가</th><th>콘테나</th><th>단가(원/kg)</th><th>중량(kg)</th><th>매입액(원)</th><th></th></tr></thead><tbody>
+ ${igRows}
+ <tr class="tot"><td>합계</td><td></td><td>${W(a.ipgoConte)}</td><td></td><td>${W(a.ipgoKg)}</td><td>${W(a.ipgoCost)}</td><td></td></tr>
+ </tbody></table></div>
+ ${edI?`<button class="btn" style="margin-top:8px" onclick="addIpgo()">＋ 입고 행 추가</button>`:'<p class="mut" style="margin:6px 0">값을 바꾸려면 [✏ 수정]을 누르세요.</p>'}`
+  : `<p class="mut" style="margin:6px 0">총 ${W(a.ipgoConte)}콘테나 · ${W(a.ipgoKg)}kg · 매입액 ${W(a.ipgoCost)}원 <span class="pill">펼치기</span></p>`;
+ const jigHead=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">농가 지급(입금)내역 <span class="pill">${DB.jigeup.length}건</span></h2><div class="row">${UI.open['jigeup']?editBtn('jigeup'):''}<button class="btn alt" style="padding:5px 12px" onclick="toggle('jigeup')">${caret('jigeup')}</button></div></div>`;
+ const jigBody=UI.open['jigeup']
+  ? `<table><thead><tr><th>지급일</th><th>농가</th><th>지급액(원)</th><th></th></tr></thead><tbody>
+ ${jigRows}
+ <tr class="tot"><td>합계</td><td></td><td>${W(a.jigeup)}</td><td></td></tr>
+ </tbody></table>
+ ${edJ?`<button class="btn" style="margin-top:8px" onclick="addJig()">＋ 지급내역 추가</button>`:''}`
+  : `<p class="mut" style="margin:6px 0">지급 합계 ${W(a.jigeup)}원 · 미지급 ${W(a.mijigeup)}원 <span class="pill">펼치기</span></p>`;
+ return `
+ <div class="card">${igHead}${igBody}</div>
+
+ <div class="card"><h2>농가별 매입 / 지급 / 미지급</h2>
+ <table><thead><tr><th class="l">농가</th><th>콘테나</th><th>매입액(원)</th><th>지급액(원)</th><th>미지급(원)</th></tr></thead><tbody>
+ ${farms.map(k=>{const cost=(byFarm[k]||{cost:0}).cost,c=(byFarm[k]||{c:0}).c,p=paid[k]||0;return `<tr><td class="l">${k}</td><td>${W(c)}</td><td>${W(cost)}</td><td>${W(p)}</td><td>${W(cost-p)}</td></tr>`}).join('')}
+ <tr class="tot"><td class="l">합계</td><td>${W(a.ipgoConte)}</td><td>${W(a.ipgoCost)}</td><td>${W(a.jigeup)}</td><td>${W(a.mijigeup)}</td></tr>
+ </tbody></table></div>
+
+ <div class="card">${jigHead}${jigBody}
+ <div class="note" style="margin-top:10px">미지급 잔액 = 매입액 − 지급액. <b>산양</b>은 가져온 날(6/10) 전액 현금지급 처리했습니다.</div></div>`;
+}
+
+function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();render();}
+function addGp(){DB.gongpan.push({date:'',market:'서울가락 농협공판장',boxKg:3,boxes:0,net:null});save();render();}
+function delGp(i){DB.gongpan.splice(i,1);save();render();}
+const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
+function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
+ const rows=DB.gongpan.map((x,i)=>{const kg=(x.boxKg||0)*(x.boxes||0);const cost=kg*cKg;const pbCost=(x.boxKg||0)*cKg;
+   const pbNet=(x.net!=null&&x.boxes)?x.net/x.boxes:null;const kgNet=(x.net!=null&&kg)?x.net/kg:null;
+   const pbMar=pbNet!=null?pbNet-pbCost:null;const rowMar=x.net!=null?x.net-cost:null;
+   const c1=ed?`<td>${inp(x.date,`setGp(${i},'date',this.value)`,70)}</td>
+   <td>${inp(x.market,`setGp(${i},'market',this.value)`,130)}</td>
+   <td>${inn(x.boxKg,`setGp(${i},'boxKg',this.value)`,52)}</td>
+   <td>${inn(x.boxes,`setGp(${i},'boxes',this.value)`,64)}</td>
+   <td>${W(kg)}</td>
+   <td><input type="text" inputmode="numeric" value="${fmtN(x.net)}" oninput="liveComma(this)" onchange="setGp(${i},'net',this.value)" style="width:110px;text-align:right" placeholder="정산 대기"></td>`
+   :`<td class="l">${x.date||''}</td><td class="l">${x.market||''}</td><td>${W(x.boxKg)}</td><td>${W(x.boxes)}</td><td>${W(kg)}</td><td>${x.net==null?'<span class="tag warn">대기</span>':W(x.net)}</td>`;
+   return `<tr>${c1}
+   <td>${kgNet==null?'-':W(kgNet)}</td>
+   <td>${pbNet==null?'-':W(pbNet)}</td>
+   <td>${W(pbCost)}</td>
+   <td>${sg(pbMar)}</td>
+   <td>${sg(rowMar)}</td>
+   <td>${ed?`<button class="btn warn" style="padding:3px 8px" onclick="delGp(${i})">삭제</button>`:''}</td></tr>`}).join('');
+ return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">공판(도매) 출하·정산·마진</h2>${editBtn('gongpan')}</div>
+ <div class="kpis" style="margin:12px 0">
+   ${kpi('총 정산액',W(a.gpNet),'원')}
+   ${kpi('총 매입원가',W(a.gpCost),'원 ('+W(a.gpSettledKg)+'kg×'+W(cKg)+')')}
+   ${kpi('총 마진',W(a.gpMargin),'원')}
+   ${kpi('마진율',(a.gpMrate*100).toFixed(1),'%')}
+ </div>
+ <div class="row" style="margin-bottom:10px"><label>매입단가(원/kg) ${ed?`<input type="text" inputmode="numeric" value="${fmtN(cKg)}" oninput="liveComma(this)" onchange="DB.gpCostKg=N(this.value);save();render()" style="text-align:right">`:`<b>${W(cKg)}</b>`}</label>
+ <span class="mut">예) 3kg 박스 매입원가 = 3 × ${W(cKg)} = ${W(3*cKg)}원 / 18kg = ${W(18*cKg)}원</span></div>
+ <div class="scroll"><table><thead><tr><th>출고일</th><th>시장·도매법인</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead><tbody>
+ ${rows}
+ <tr class="tot"><td>합계</td><td></td><td></td><td></td><td>${W(a.gpKg)}</td><td>${W(a.gpNet)}</td><td></td><td></td><td>${W(a.gpCost)}</td><td></td><td>${sg(a.gpMargin)}</td><td></td></tr>
+ </tbody></table></div>
+ ${ed?`<button class="btn" style="margin-top:8px" onclick="addGp()">＋ 공판 출하 추가</button>`:'<p class="mut" style="margin:6px 0">값을 바꾸려면 [✏ 수정]을 누르세요.</p>'}
+ <div class="note" style="margin-top:10px">규격(박스kg)·박스수만 넣으면 중량은 자동(규격×박스수). 정산액을 넣으면 <b>역산</b>으로 kg당·박스당 정산이 계산되고, 매입단가(${W(cKg)}원/kg)로 박스당 원가·마진·총마진이 나옵니다. 현재 <b>15+16은 합산정산</b>, <b>6/18(480개)은 정산완료</b>, <b>6/21(1,200개)은 미정산</b>으로 입력돼 있습니다. 시장·도매법인은 임의로 '서울가락 농협공판장' 일괄 입력했습니다.</div></div>`;
+}
+const CASH_CAT={입금:['채널정산','계좌입금','현금','기타'],지출:['광고비','인건비','박스/포장재','택배비','농가지급','임대료','기타']};
+function addCash(type){DB.cash=DB.cash||[];DB.cash.push({date:'',type:type,cat:'',memo:'',amt:0});save();render();}
+function setCash(i,f,v){DB.cash[i][f]=(f==='amt')?N(v):v;save();render();}
+function delCash(i){DB.cash.splice(i,1);save();render();}
+function setCashOpen(v){DB.cashOpen=N(v);save();render();}
+function vCash(){const a=agg();const ed=editMode('cash');const cash=DB.cash||[];
+ const byCat={};cash.forEach(x=>{if(x.type==='지출')byCat[x.cat||'기타']=(byCat[x.cat||'기타']||0)+(x.amt||0);});
+ const catSel=(i,x)=>`<select onchange="setCash(${i},'cat',this.value)" style="width:120px"><option value="">분류선택</option>${(CASH_CAT[x.type]||[]).map(c=>`<option ${x.cat===c?'selected':''}>${c}</option>`).join('')}${x.cat&&!(CASH_CAT[x.type]||[]).includes(x.cat)?`<option selected>${x.cat}</option>`:''}</select>`;
+ const typeSel=(i,x)=>`<select onchange="setCash(${i},'type',this.value)" style="width:64px"><option ${x.type==='입금'?'selected':''}>입금</option><option ${x.type==='지출'?'selected':''}>지출</option></select>`;
+ let bal=DB.cashOpen||0;
+ const rows=cash.map((x,i)=>{bal+=(x.type==='입금'?(x.amt||0):-(x.amt||0));
+  return ed?`<tr>
+   <td>${inp(x.date,`setCash(${i},'date',this.value)`,80)}</td>
+   <td>${typeSel(i,x)}</td><td>${catSel(i,x)}</td>
+   <td>${inp(x.memo,`setCash(${i},'memo',this.value)`,200)}</td>
+   <td>${inn(x.amt,`setCash(${i},'amt',this.value)`,110)}</td>
+   <td><button class="btn warn" style="padding:3px 8px" onclick="delCash(${i})">삭제</button></td></tr>`
+  :`<tr><td class="l">${x.date||''}</td><td><span class="tag ${x.type==='입금'?'ok':'warn'}">${x.type}</span></td><td class="l">${x.cat||''}</td><td class="l">${x.memo||''}</td>
+   <td style="color:#2E5E3A">${x.type==='입금'?W(x.amt):''}</td><td style="color:#c0392b">${x.type==='지출'?W(x.amt):''}</td><td>${W(bal)}</td></tr>`;}).join('');
+ const head=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">거래내역 <span class="pill">${cash.length}건</span></h2>${editBtn('cash')}</div>`;
+ const table=ed
+  ? `<div class="scroll"><table><thead><tr><th>일자</th><th>구분</th><th>분류</th><th>내용</th><th>금액</th><th></th></tr></thead><tbody>${rows||''}</tbody></table></div>
+     <div class="row" style="margin-top:8px"><button class="btn" onclick="addCash('입금')">＋ 입금 추가</button><button class="btn" style="background:#c0392b" onclick="addCash('지출')">＋ 지출 추가</button></div>`
+  : `<div class="scroll"><table><thead><tr><th>일자</th><th>구분</th><th>분류</th><th>내용</th><th>입금</th><th>지출</th><th>잔액</th></tr></thead><tbody>${rows||'<tr><td colspan=7 class="mut">거래내역이 없습니다. [✏ 수정]에서 입금·지출을 추가하세요.</td></tr>'}
+     <tr class="tot"><td colspan="4">합계</td><td style="color:#2E5E3A">${W(a.cashIn)}</td><td style="color:#c0392b">${W(a.cashOut)}</td><td>${W(a.balance)}</td></tr></tbody></table></div>`;
+ const cats=Object.keys(byCat).sort((x,y)=>byCat[y]-byCat[x]);
+ return `<div class="card"><h2>자금현황</h2><div class="kpis">
+   ${kpi('기초잔고',W(DB.cashOpen||0),'원')}
+   ${kpi('총 입금',W(a.cashIn),'원')}
+   ${kpi('총 지출',W(a.cashOut),'원')}
+   ${kpi('현재 잔고',W(a.balance),'원')}
+ </div>
+ <div class="row" style="margin-top:8px"><label>기초잔고 ${ed?`<input type="text" inputmode="numeric" value="${fmtN(DB.cashOpen||0)}" oninput="liveComma(this)" onchange="setCashOpen(this.value)" style="text-align:right">`:`<b>${W(DB.cashOpen||0)}원</b>`}</label>
+ <span class="mut">잔고 = 기초잔고 + 입금합계 − 지출합계</span></div></div>
+
+ <div class="card">${head}${table}
+ <div class="note" style="margin-top:10px">광고비·인건비·박스/포장재·택배비·농가지급 등 <b>지출</b>과 채널정산·계좌입금 등 <b>입금</b>을 적으면 잔고가 자동 계산됩니다. 발주방 고객 입금은 엑셀을 [업로드]하면 정리해 드릴게요.</div></div>
+
+ ${cats.length?`<div class="card"><h2>지출 분류별 요약</h2><table><thead><tr><th class="l">분류</th><th>금액(원)</th><th>비중</th></tr></thead><tbody>
+ ${cats.map(c=>`<tr><td class="l">${c}</td><td>${W(byCat[c])}</td><td>${a.cashOut?(byCat[c]/a.cashOut*100).toFixed(0):0}%</td></tr>`).join('')}
+ <tr class="tot"><td class="l">지출 합계</td><td>${W(a.cashOut)}</td><td>100%</td></tr></tbody></table></div>`:''}`;
+}
+
+function vStock(){const a=agg();
+ const rows=[['총 매입',a.ipgoConte,a.ipgoKg],['도매(공판) 출하',a.gpKg/KGU,a.gpKg],['공구·직판(발주방)',a.baljuKg/KGU,a.baljuKg],
+  ...CH.map(c=>[c,a.chs[c].conte,a.chs[c].kg])];
+ return `<div class="card"><h2>재고현황 <span class="pill">콘테나 19kg 기준</span></h2>
+ <table><thead><tr><th class="l">구분</th><th>콘테나</th><th>환산중량(kg)</th></tr></thead><tbody>
+ ${rows.map((r,i)=>`<tr${i===0?' class="tot"':''}><td class="l">${r[0]}</td><td>${W1(r[1])}</td><td>${W(r[2])}</td></tr>`).join('')}
+ <tr class="tot"><td class="l">총 출고·판매</td><td>${W1(a.outConte)}</td><td>${W(a.outKg)}</td></tr>
+ <tr class="tot" style="background:#fff2cc!important"><td class="l">현재고(원물)</td><td>${W1(a.stockConte)}</td><td>${W(a.stockKg)}</td></tr>
+ </tbody></table>
+ <div class="row" style="margin-top:12px"><label>상품화율(%) <input type="number" id="seon" value="${Math.round(DB.seon*100)}" onchange="DB.seon=this.value/100;save();render()"></label>
+ <span class="mut">추정 상품가능: <b>${W1(a.ipgoConte*DB.seon)}</b> 콘테나</span></div>
+ <div class="note" style="margin-top:12px">입고는 19kg 콘테나(원물), 판매는 소포장입니다. 선별·소분 로스와 등급분리는 상품화율로 반영하세요.</div></div>`;
+}
+
+function vPnl(){const a=agg();
+ return `<div class="card"><h2>손익요약</h2>
+ <table><tbody>
+ <tr><td class="l">도매(공판) 정산</td><td>${W(a.gpNet)}</td></tr>
+ <tr><td class="l">공구·직판 매출</td><td>${W(a.baljuSale)}</td></tr>
+ ${CH.map(c=>`<tr><td class="l">${c} 매출</td><td>${W(a.chs[c].sale)}</td></tr>`).join('')}
+ <tr class="tot"><td class="l">매출 합계</td><td>${W(a.rev)}</td></tr>
+ <tr><td class="l">매입원가(총 발생)</td><td>${W(a.ipgoCost)}</td></tr>
+ <tr><td class="l">(−) 기말재고 자산</td><td>${W(a.stockAsset)}</td></tr>
+ <tr class="tot"><td class="l">매출원가(판매분)</td><td>${W(a.cogs)}</td></tr>
+ <tr><td class="l">채널 수수료(합계)</td><td>${W(a.chFee)}</td></tr>
+ <tr class="tot" style="background:#fff2cc!important"><td class="l">순이익(추정)</td><td>${W(a.profit-a.chFee)}</td></tr>
+ </tbody></table>
+ <p class="mut">※ 매출원가는 판매분만(재고자산 차감). 박스·택배·인건비 등 부대비용은 미반영. 공판 미정산분 제외.</p></div>`;
+}
+
+function vSync(){
+ return `<div class="card"><h2>GitHub 동기화 <span class="pill">여러 기기 공유</span></h2>
+ <div class="note" style="margin-bottom:12px">⚠️ 발주방에 고객 개인정보(이름·전화·주소)가 있습니다. <b>반드시 Private(비공개) 저장소</b>를 쓰세요. 토큰은 이 브라우저에만 저장됩니다.</div>
+ <div style="display:grid;grid-template-columns:120px 1fr;gap:8px;max-width:520px;align-items:center">
+  <label>GitHub 아이디</label>${inp(GH.owner,"setGH('owner',this.value)",230)}
+  <label>저장소 이름</label>${inp(GH.repo,"setGH('repo',this.value)",230)}
+  <label>파일 경로</label><input value="${GH.path||'data.json'}" onchange="setGH('path',this.value)" style="width:230px">
+  <label>브랜치</label><input value="${GH.branch||'main'}" onchange="setGH('branch',this.value)" style="width:230px">
+  <label>토큰(PAT)</label><input type="password" value="${GH.token||''}" onchange="setGH('token',this.value)" style="width:230px" placeholder="github_pat_... / ghp_...">
+ </div>
+ <div class="row" style="margin-top:14px">
+  <button class="btn" onclick="ghPush()">⬆ GitHub에 저장</button>
+  <button class="btn alt" onclick="ghPull()">⬇ GitHub에서 불러오기</button>
+  <label style="margin-left:6px"><input type="checkbox" ${GH.auto!==false?'checked':''} onchange="setGH('auto',this.checked)"> 자동저장(변경 3초 후)</label>
+  <button class="btn warn" onclick="if(confirm('토큰·설정을 지울까요?')){GH={};ghSaveCfg();render();}">설정 지우기</button>
+ </div>
+ <p id="ghst" class="mut" style="margin-top:10px">대기 중</p>
+ <h3>토큰 발급 (1회만)</h3>
+ <div class="note" style="line-height:1.8">
+ 1) GitHub에서 <b>Private(비공개)</b> 저장소를 새로 만듭니다 (예: danhobak-data).<br>
+ 2) 프로필 → <b>Settings</b> → 맨아래 <b>Developer settings</b> → <b>Personal access tokens → Fine-grained tokens → Generate new token</b><br>
+ 3) <b>Repository access</b>: Only select repositories에서 그 저장소 선택<br>
+ 4) <b>Permissions → Repository permissions → Contents: Read and write</b><br>
+ 5) 생성된 토큰을 위 토큰칸에 붙여넣고, 아이디·저장소 이름을 채운 뒤 <b>⬆ GitHub에 저장</b> → data.json이 만들어집니다.<br>
+ 6) 다른 기기에서는 같은 정보를 넣고 <b>⬇ 불러오기</b>를 누르면 동일 데이터가 들어옵니다.</div>
+ <p class="mut">※ 파일을 더블클릭(file://)해서 안 되면 GitHub Pages 주소로 열어 사용하세요.</p>
+ </div>`;
+}
+
+/* ---------- 직원 대시보드용 요약(개인정보 없음) ---------- */
+function buildSummary(){const a=agg();
+ return {updated:new Date().toISOString(),
+  stock:{maeipConte:Math.round(a.ipgoConte),stockConte:+a.stockConte.toFixed(1),stockKg:Math.round(a.stockKg),outConte:+a.outConte.toFixed(1)},
+  sales:{total:Math.round(a.rev),gongpan:Math.round(a.gpNet),gonggu:Math.round(a.baljuRev),channels:CH.map(c=>({ch:c,kg:Math.round(a.chs[c].kg),sale:Math.round(a.chs[c].sale),fee:Math.round(a.chs[c].fee),pay:Math.round(a.chs[c].pay),cnt:a.chs[c].cnt}))},
+  gongpan:{net:Math.round(a.gpNet),cost:Math.round(a.gpCost),margin:Math.round(a.gpMargin),mrate:+(a.gpMrate*100).toFixed(1),kg:Math.round(a.gpKg)},
+  gonggu:{paid:Math.round(a.baljuPaidSale),misu:Math.round(a.baljuMisu),service:Math.round(a.baljuService),serviceKg:Math.round(a.baljuServiceKg),cPaid:a.cPaid,cMisu:a.cMisu,cSvc:a.cSvc,kg:Math.round(a.baljuKg)},
+  pnl:{rev:Math.round(a.rev),cogs:Math.round(a.cogs),fee:Math.round(a.chFee),profit:Math.round(a.profit-a.chFee)},
+  cash:{open:Math.round(DB.cashOpen||0),in:Math.round(a.cashIn),out:Math.round(a.cashOut),balance:Math.round(a.balance)},
+  farm:{maeip:Math.round(a.ipgoCost),paid:Math.round(a.jigeup),unpaid:Math.round(a.mijigeup)}};
+}
+function exportSummary(){const b=new Blob([JSON.stringify(buildSummary(),null,1)],{type:'application/json'});const u=URL.createObjectURL(b);const el=document.createElement('a');el.href=u;el.download='summary.json';el.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+
+/* ---------- 엑셀 내보내기 ---------- */
+function exportXlsx(){
+ const wb=XLSX.utils.book_new();const a=agg();
+ const dash=[['구분','콘테나','중량kg','매출','수수료','정산'],
+  ['공판',a.gpKg/KGU,a.gpKg,a.gpNet,'',a.gpNet],
+  ['공구·직판',a.baljuKg/KGU,a.baljuKg,a.baljuSale,'',a.baljuSale],
+  ...CH.map(c=>[c,a.chs[c].conte,a.chs[c].kg,a.chs[c].sale,a.chs[c].fee,a.chs[c].pay]),
+  ['현재고',a.stockConte,a.stockKg,'','',''],['순이익','','','','',a.profit-a.chFee]];
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dash),'요약');
+ CH.forEach(c=>{const arr=DB.channels[c]||[];if(!arr.length)return;
+  const aoa=[['일자','주문번호','옵션','박스kg','수량','중량kg','콘테나','판매금','할인','수수료','정산']];
+  arr.forEach(x=>aoa.push([x.date,x.order,x.opt,x.boxKg,x.qty,x.kg,+x.conte.toFixed(1),x.gross,x.disc,x.fee,x.payout]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),c);});
+ const cKg=DB.gpCostKg||1600;
+ const gp=[['출고일','시장·도매법인','규격kg','박스수','중량kg','정산액','kg당정산','박스당정산','박스당원가','박스당마진','행마진']];
+ DB.gongpan.forEach(x=>{const kg=(x.boxKg||0)*(x.boxes||0);const pbN=(x.net!=null&&x.boxes)?Math.round(x.net/x.boxes):'';const pbC=(x.boxKg||0)*cKg;
+  gp.push([x.date,x.market,x.boxKg,x.boxes,kg,x.net,(x.net!=null&&kg)?Math.round(x.net/kg):'',pbN,pbC,pbN===''?'':pbN-pbC,x.net!=null?x.net-kg*cKg:'']);});
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(gp),'공판마진');
+ const bj=[['일자','받는분','옵션','중량kg','콘테나','주문금액','상태']];
+ DB.balju.forEach(x=>bj.push([x.date,x.order,x.opt,x.kg,+x.conte.toFixed(1),x.gross,x.status||'입금완료']));
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(bj),'발주방');
+ const ig=[['입고일','농가','콘테나','단가','매입액']];
+ DB.ipgo.forEach(x=>ig.push([x.date,x.farm,x.conte,x.priceKg,x.conte*KGU*x.priceKg]));
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ig),'입고');
+ XLSX.writeFile(wb,'단호박_통합관리_export.xlsx');
+}
+
+DB=load();
+try{ render(); }catch(e){ document.getElementById('app').innerHTML='<div class="card"><h2>오류</h2><p>'+e.message+'</p></div>'; }
+if(ghReady()) setTimeout(ghPull,150); // 연결돼 있으면 GitHub에서 자동으로 최신 데이터 불러오기
+</script>
+</body>
+</html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                              

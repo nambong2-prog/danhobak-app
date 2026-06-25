@@ -495,7 +495,7 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
  ${ed?`<button class="btn" style="margin-top:8px" onclick="addGp()">＋ 공판 출하 추가</button>`:'<p class="mut" style="margin:6px 0">값을 바꾸려면 [✏ 수정]을 누르세요.</p>'}
  <div class="note" style="margin-top:10px">규격(박스kg)·박스수만 넣으면 중량은 자동(규격×박스수). 정산액을 넣으면 <b>역산</b>으로 kg당·박스당 정산이 계산되고, 매입단가(${W(cKg)}원/kg)로 박스당 원가·마진·총마진이 나옵니다.</div></div>`;
 }
-const CASH_CAT={입금:['채널정산','계좌입금','현금','기타'],지출:['광고비','인건비','박스/포장재','택배비','농가지급','임대료','기타']};
+const CASH_CAT={입금:['채널정산','계좌입금','현금','기타'],지출:['인건비','판공비','인쇄비','광고비','택배비','박스/포장재','임대료','농가지급','기타']};
 function addCash(type){DB.cash=DB.cash||[];DB.cash.push({date:'',type:type,cat:'',memo:'',amt:0});save();render();}
 function setCash(i,f,v){DB.cash[i][f]=(f==='amt')?N(v):v;save();render();}
 function delCash(i){DB.cash.splice(i,1);save();render();}
@@ -570,7 +570,14 @@ function vPnl(){const a=agg();
 
 function vInvestor(){const a=agg();
  const chans=[['공판(도매)',a.gpNet],['발주방(공동구매)',a.baljuSale],['쿠팡',a.chs['쿠팡'].sale],['스마트스토어',a.chs['스마트스토어'].sale],['토스',a.chs['토스'].sale],['톡스토어',a.chs['톡스토어'].sale]].filter(r=>r[1]>0);
- const rev=a.rev||1;const net=a.profit-a.chFee;const today=new Date().toLocaleDateString('ko-KR');
+ const rev=a.rev||1;const today=new Date().toLocaleDateString('ko-KR');
+ const exp={};(DB.cash||[]).forEach(x=>{if(x.type==='지출')exp[x.cat||'기타']=(exp[x.cat||'기타']||0)+(x.amt||0);});
+ const sgaItems=[['채널 수수료',a.chFee],['인건비',exp['인건비']||0],['판공비',exp['판공비']||0],['인쇄비',exp['인쇄비']||0],['광고비',exp['광고비']||0],['택배비',exp['택배비']||0],['박스/포장재',exp['박스/포장재']||0],['임대료',exp['임대료']||0],['기타',exp['기타']||0]];
+ const sga=sgaItems.reduce((s,r)=>s+r[1],0);
+ const gross=a.rev-a.cogs;const op=gross-sga;
+ const rateG=a.rev?(gross/a.rev*100):0;const rateO=a.rev?(op/a.rev*100):0;
+ const aCash=a.balance,aStock=a.stockAsset,aPre=(a.mijigeup<0?-a.mijigeup:0);
+ const aTot=aCash+aStock+aPre;const lPay=(a.mijigeup>0?a.mijigeup:0);const lTot=lPay;const eq=aTot-lTot;
  return `<div class="card noprint" style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">투자자용 요약</h2><button class="btn" onclick="window.print()">📄 PDF로 저장 / 인쇄</button></div>
  <div id="investorReport" class="card">
   <div style="text-align:center;border-bottom:2px solid var(--g);padding-bottom:12px;margin-bottom:18px">
@@ -578,28 +585,35 @@ function vInvestor(){const a=agg();
    <p style="margin:4px 0 0;color:var(--mut)">사업 현황 요약 · ${today} 기준</p></div>
 
   <h2>1. 매출 &amp; 채널 구성</h2>
-  <div class="kpis" style="margin-bottom:10px">${kpi('총 매출',W(a.rev),'원')}${kpi('판매 채널',chans.length,'개 채널 운영')}${kpi('취급 물량',W(a.ipgoConte),'콘테나(19kg)')}</div>
+  <div class="kpis" style="margin-bottom:10px">${kpi('총 매출',W(a.rev),'원')}${kpi('판매 채널',chans.length,'개 채널')}${kpi('취급 물량',W(a.ipgoConte),'콘테나(19kg)')}</div>
   <table><thead><tr><th class="l">채널</th><th>매출(원)</th><th>비중</th></tr></thead><tbody>
   ${chans.map(c=>`<tr><td class="l">${c[0]}</td><td>${W(c[1])}</td><td>${(c[1]/rev*100).toFixed(1)}%</td></tr>`).join('')}
   <tr class="tot"><td class="l">합계</td><td>${W(a.rev)}</td><td>100%</td></tr></tbody></table>
-  <p class="mut">도매(공판)·공동구매·온라인 등 ${chans.length}개 채널로 분산되어 단일 채널 리스크가 낮습니다.</p>
 
-  <h2>2. 수익성</h2>
-  <div class="kpis">${kpi('공판 마진율',(a.gpMrate*100).toFixed(1),'%')}${kpi('공판 마진액',W(a.gpMargin),'원')}${kpi('채널 수수료',W(a.chFee),'원')}${kpi('순이익(추정)',W(net),net<0?'원 · 재고·부대비 영향':'원')}</div>
-  <p class="mut">공판 출하 기준 마진율 <b>${(a.gpMrate*100).toFixed(1)}%</b>. ※순이익(추정)은 미판매 재고자산과 부대비용이 반영된 값으로, 시즌 정산 시 확정됩니다.</p>
+  <h2>2. 손익계산서 (요약)</h2>
+  <table><thead><tr><th class="l">항목</th><th>금액(원)</th><th>비율</th></tr></thead><tbody>
+   <tr><td class="l">매출액</td><td>${W(a.rev)}</td><td>100%</td></tr>
+   <tr><td class="l" style="padding-left:22px;color:#666">(−) 매출원가(판매분)</td><td>(${W(a.cogs)})</td><td>${(a.cogs/rev*100).toFixed(1)}%</td></tr>
+   <tr class="tot"><td class="l">매출총이익</td><td>${W(gross)}</td><td>${rateG.toFixed(1)}%</td></tr>
+   <tr><td class="l">(−) 판매관리비</td><td>(${W(sga)})</td><td>${(sga/rev*100).toFixed(1)}%</td></tr>
+   ${sgaItems.map(r=>`<tr><td class="l" style="padding-left:22px;color:#888">${r[0]}</td><td style="color:#888">${W(r[1])}</td><td></td></tr>`).join('')}
+   <tr class="tot" style="background:#fff2cc!important"><td class="l">영업이익</td><td>${W(op)}</td><td>${rateO.toFixed(1)}%</td></tr>
+  </tbody></table>
+  <p class="mut">매출총이익률 <b>${rateG.toFixed(1)}%</b> · 영업이익률 <b>${rateO.toFixed(1)}%</b>. ※판매관리비(인건비·판공비·인쇄비 등)는 [자금현황]에 통장내역을 올려 분류하면 자동 반영됩니다.</p>
 
-  <h2>3. 재무 현황</h2>
-  <div class="kpis">${kpi('현금 잔고',W(a.balance),'원')}${kpi('총 매입원가',W(a.ipgoCost),'원')}${kpi('현재고 자산',W(a.stockAsset),'원(≈'+W1(a.stockConte)+'콘테나)')}${kpi('농가 미지급',W(a.mijigeup),'원')}</div>
-  <table><thead><tr><th class="l">항목</th><th>금액(원)</th></tr></thead><tbody>
-  <tr><td class="l">총 매입원가</td><td>${W(a.ipgoCost)}</td></tr>
-  <tr><td class="l">농가 지급 완료</td><td>${W(a.jigeup)}</td></tr>
-  <tr><td class="l">농가 미지급 잔액</td><td>${W(a.mijigeup)}</td></tr>
-  <tr><td class="l">현재고 자산(추정)</td><td>${W(a.stockAsset)}</td></tr>
-  <tr><td class="l">현금 잔고</td><td>${W(a.balance)}</td></tr></tbody></table>
-  <p class="mut" style="margin-top:14px;font-size:11px">※ 본 자료는 내부 관리 데이터 기반 요약이며 외부 회계감사 자료가 아닙니다.</p>
+  <h2>3. 재무 상태 (요약)</h2>
+  <table><thead><tr><th class="l">구분</th><th>금액(원)</th></tr></thead><tbody>
+   <tr class="tot"><td class="l">자산 합계</td><td>${W(aTot)}</td></tr>
+   <tr><td class="l" style="padding-left:22px;color:#666">현금 잔고</td><td>${W(aCash)}</td></tr>
+   <tr><td class="l" style="padding-left:22px;color:#666">재고 자산 (≈${W1(a.stockConte)}콘테나)</td><td>${W(aStock)}</td></tr>
+   ${aPre?`<tr><td class="l" style="padding-left:22px;color:#666">농가 선지급금</td><td>${W(aPre)}</td></tr>`:''}
+   <tr class="tot"><td class="l">부채 합계</td><td>${W(lTot)}</td></tr>
+   <tr><td class="l" style="padding-left:22px;color:#666">매입채무(농가 미지급)</td><td>${W(lPay)}</td></tr>
+   <tr class="tot" style="background:#e9f3ea!important"><td class="l">순자산(자본)</td><td>${W(eq)}</td></tr>
+  </tbody></table>
+  <p class="mut" style="margin-top:14px;font-size:11px">※ 내부 관리 데이터 기반 요약이며 외부 회계감사 자료가 아닙니다. 통장내역 반영 후 영업이익이 확정됩니다.</p>
  </div>`;
 }
-
 function vSync(){
  return `<div class="card"><h2>GitHub 동기화 <span class="pill">여러 기기 공유</span></h2>
  <div class="note" style="margin-bottom:12px">⚠️ 발주방에 고객 개인정보(이름·전화·주소)가 있습니다. <b>반드시 Private(비공개) 저장소</b>를 쓰세요. 토큰은 이 브라우저에만 저장됩니다.</div>

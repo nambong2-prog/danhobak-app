@@ -231,7 +231,13 @@ function agg(){
    if(st==='서비스'){baljuService+=x.gross;baljuServiceKg+=x.kg;cSvc++;}
    else if(st==='미수'){baljuMisu+=x.gross;cMisu++;}
    else {baljuPaidSale+=x.gross;cPaid++;}});
- const baljuRev=baljuPaidSale+baljuMisu;const baljuSale=baljuRev;
+ const baljuRev=baljuPaidSale+baljuMisu;
+ const baljuDeposit=DB.balju.reduce((s,x)=>s+N(x.depRaw),0);
+ const _pg={};DB.balju.forEach((x,i)=>{const k=x.payer?('P:'+x.payer):('R:'+i);(_pg[k]=_pg[k]||{ord:0,dep:0,payer:x.payer||x.order||'-'});_pg[k].ord+=x.gross;_pg[k].dep+=N(x.depRaw);});
+ const baljuOverList=[],baljuUnderList=[];let baljuOver=0,baljuUnder=0;
+ Object.values(_pg).forEach(o=>{const d=o.dep-o.ord;if(d>0.5){baljuOver+=d;baljuOverList.push({payer:o.payer,ord:o.ord,dep:o.dep,diff:d});}else if(d<-0.5){baljuUnder+=(-d);baljuUnderList.push({payer:o.payer,ord:o.ord,dep:o.dep,diff:d});}});
+ baljuOverList.sort((a,b)=>b.diff-a.diff);baljuUnderList.sort((a,b)=>a.diff-b.diff);
+ const baljuSale=baljuDeposit;
  const cash=DB.cash||[];
  const cashIn=cash.filter(x=>x.type==='입금').reduce((s,x)=>s+(x.amt||0),0);
  const cashOut=cash.filter(x=>x.type==='지출').reduce((s,x)=>s+(x.amt||0),0);
@@ -249,7 +255,7 @@ function agg(){
  const rev=gpNet+baljuSale+chSale;
  const cogs=ipgoCost-stockAsset;
  const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
- return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,
+ return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,
    outKg,outConte,stockConte,stockKg,avgKg,stockAsset,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
    profit:rev-cogs};
 }
@@ -289,7 +295,7 @@ function vDash(){const a=agg();
  ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.cnt&&!s.hasFee?'<span class="tag warn">수수료 별도</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
  <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr>
  </tbody></table>
- <p class="mut">발주방: 입금완료 ${a.cPaid}건·${W(a.baljuPaidSale)}원 · <b style="color:#c0392b">미수 ${a.cMisu}건·${W(a.baljuMisu)}원</b> · 서비스(무료) ${a.cSvc}건·${W(a.baljuServiceKg)}kg(정가 ${W(a.baljuService)}원). 매출엔 입금완료+미수만 반영됩니다.</p>
+ <p class="mut">발주방: 입금완료 ${a.cPaid}건·${W(a.baljuPaidSale)}원 · <b style="color:#c0392b">미수 ${a.cMisu}건·${W(a.baljuMisu)}원</b> · 서비스(무료) ${a.cSvc}건·${W(a.baljuServiceKg)}kg(정가 ${W(a.baljuService)}원). 발주방 매출은 <b>실제 입금액 ${W(a.baljuDeposit)}원</b> 기준입니다.</p>
  <p class="mut">※ 쿠팡·토스 발주파일은 최종 수수료가 없어 '수수료 별도'로 표시됩니다. 정산서를 올리면 자동 반영됩니다.</p></div>`;
 }
 const kpi=(l,v,u)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="u">${u}</div></div>`;
@@ -383,6 +389,8 @@ function vChannels(){
    : `<p class="mut" style="margin:6px 0">${DB.balju.length}건 줄임 — 펼치면 상태 헤더 클릭으로 미수만 골라볼 수 있습니다.</p>`;
   html+=`<div class="card"><h2>발주방 <span class="pill">${DB.balju.length}건</span></h2>
    <div class="kpis" style="margin-bottom:12px">${kpi('입금완료',W(a.baljuPaidSale),a.cPaid+'건')}${kpi('미수',W(a.baljuMisu),a.cMisu+'건')}${kpi('서비스(무료)',W(a.baljuServiceKg)+'kg',a.cSvc+'건·정가 '+W(a.baljuService)+'원')}</div>
+   <div class="kpis" style="margin-bottom:12px">${kpi('실제 입금액',W(a.baljuDeposit),'원 · 발주방 매출 기준')}${kpi('주문금액 합',W(a.baljuPaidSale+a.baljuMisu),'원 (참고)')}${kpi('추가입금',(a.baljuOver?'+':'')+W(a.baljuOver),a.baljuOverList.length+'명')}${kpi('덜입금',(a.baljuUnder?'-':'')+W(a.baljuUnder),a.baljuUnderList.length+'명')}</div>
+   ${(a.baljuOverList.length||a.baljuUnderList.length)?`<details style="margin-bottom:12px"><summary style="cursor:pointer;color:#2E5E3A;font-weight:700;padding:4px 0">입금 차이 내역 (입금자별 ${a.baljuOverList.length+a.baljuUnderList.length}명) — 클릭해서 펼치기</summary><table style="margin-top:8px"><thead><tr><th class="l">입금자</th><th>주문금액</th><th>실제입금</th><th>차이</th></tr></thead><tbody>${a.baljuOverList.map(o=>`<tr><td class="l">${o.payer}</td><td>${W(o.ord)}</td><td>${W(o.dep)}</td><td style="color:#2E5E3A;font-weight:700">+${W(o.diff)}</td></tr>`).join('')}${a.baljuUnderList.map(o=>`<tr><td class="l">${o.payer}</td><td>${W(o.ord)}</td><td>${W(o.dep)}</td><td style="color:#c0392b;font-weight:700">${W(o.diff)}</td></tr>`).join('')}</tbody></table><p class="mut" style="margin-top:6px">차이는 보통 <b>입금자 이름 누락</b>(한 명이 여러 명 것을 합산 입금) 또는 <b>미입금</b> 때문입니다. 시트의 입금자·입금액을 확인해 보세요.</p></details>`:''}
    <h3>규격별 요약 <span class="mut" style="font-weight:400">(서비스 포함 출고 기준)</span></h3>${optTable(optAgg(DB.balju),false)}
    <div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"><h3 style="margin:0">주문별 상태 <span class="mut" style="font-weight:400">상태 칩 클릭 → 입금완료/미수/서비스 전환</span></h3><button class="btn alt" style="padding:5px 12px" onclick="toggle('${k}')">${caret(k)}</button></div>
    ${detail}</div>`;}

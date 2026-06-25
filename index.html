@@ -449,7 +449,7 @@ function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup')
 }
 
 function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();render();}
-function addGp(){DB.gongpan.push({date:'',market:'서울가락 농협공판장',boxKg:3,boxes:0,net:null});save();render();}
+function addGp(){DB.gongpan.push({date:'',market:'',boxKg:3,boxes:0,net:null});save();render();}
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
 function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
@@ -484,7 +484,7 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
  <tr class="tot"><td>합계</td><td></td><td></td><td></td><td>${W(a.gpKg)}</td><td>${W(a.gpNet)}</td><td></td><td></td><td>${W(a.gpCost)}</td><td></td><td>${sg(a.gpMargin)}</td><td></td></tr>
  </tbody></table></div>
  ${ed?`<button class="btn" style="margin-top:8px" onclick="addGp()">＋ 공판 출하 추가</button>`:'<p class="mut" style="margin:6px 0">값을 바꾸려면 [✏ 수정]을 누르세요.</p>'}
- <div class="note" style="margin-top:10px">규격(박스kg)·박스수만 넣으면 중량은 자동(규격×박스수). 정산액을 넣으면 <b>역산</b>으로 kg당·박스당 정산이 계산되고, 매입단가(${W(cKg)}원/kg)로 박스당 원가·마진·총마진이 나옵니다. 현재 <b>15+16은 합산정산</b>, <b>6/18(480개)은 정산완료</b>, <b>6/21(1,200개)은 미정산</b>으로 입력돼 있습니다. 시장·도매법인은 임의로 '서울가락 농협공판장' 일괄 입력했습니다.</div></div>`;
+ <div class="note" style="margin-top:10px">규격(박스kg)·박스수만 넣으면 중량은 자동(규격×박스수). 정산액을 넣으면 <b>역산</b>으로 kg당·박스당 정산이 계산되고, 매입단가(${W(cKg)}원/kg)로 박스당 원가·마진·총마진이 나옵니다.</div></div>`;
 }
 const CASH_CAT={입금:['채널정산','계좌입금','현금','기타'],지출:['광고비','인건비','박스/포장재','택배비','농가지급','임대료','기타']};
 function addCash(type){DB.cash=DB.cash||[];DB.cash.push({date:'',type:type,cat:'',memo:'',amt:0});save();render();}

@@ -285,7 +285,7 @@ function vDash(){const a=agg();
  <div class="card"><h2>채널별 요약</h2>
  <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
  <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>-</td><td>${W(a.gpNet)}</td></tr>
- <tr><td class="l">발주방(발주방)</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
+ <tr><td class="l">발주방</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
  ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.cnt&&!s.hasFee?'<span class="tag warn">수수료 별도</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
  <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr>
  </tbody></table>
@@ -381,7 +381,7 @@ function vChannels(){
       <div class="scroll"><table><thead><tr><th>일자</th><th>받는분</th><th class="l">옵션</th><th>주문금액</th>${thStatus}<th></th></tr></thead><tbody>${dRows||'<tr><td colspan=6 class="mut">해당 상태 주문이 없습니다.</td></tr>'}</tbody></table></div>
       ${edB?`<button class="btn" style="margin-top:8px" onclick="addBalju()">＋ 주문 추가</button>`:''}`
    : `<p class="mut" style="margin:6px 0">${DB.balju.length}건 줄임 — 펼치면 상태 헤더 클릭으로 미수만 골라볼 수 있습니다.</p>`;
-  html+=`<div class="card"><h2>발주방(발주방) <span class="pill">${DB.balju.length}건</span></h2>
+  html+=`<div class="card"><h2>발주방 <span class="pill">${DB.balju.length}건</span></h2>
    <div class="kpis" style="margin-bottom:12px">${kpi('입금완료',W(a.baljuPaidSale),a.cPaid+'건')}${kpi('미수',W(a.baljuMisu),a.cMisu+'건')}${kpi('서비스(무료)',W(a.baljuServiceKg)+'kg',a.cSvc+'건·정가 '+W(a.baljuService)+'원')}</div>
    <h3>규격별 요약 <span class="mut" style="font-weight:400">(서비스 포함 출고 기준)</span></h3>${optTable(optAgg(DB.balju),false)}
    <div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"><h3 style="margin:0">주문별 상태 <span class="mut" style="font-weight:400">상태 칩 클릭 → 입금완료/미수/서비스 전환</span></h3><button class="btn alt" style="padding:5px 12px" onclick="toggle('${k}')">${caret(k)}</button></div>
@@ -530,7 +530,7 @@ function vCash(){const a=agg();const ed=editMode('cash');const cash=DB.cash||[];
 }
 
 function vStock(){const a=agg();
- const rows=[['총 매입',a.ipgoConte,a.ipgoKg],['도매(공판) 출하',a.gpKg/KGU,a.gpKg],['발주방(발주방)',a.baljuKg/KGU,a.baljuKg],
+ const rows=[['총 매입',a.ipgoConte,a.ipgoKg],['도매(공판) 출하',a.gpKg/KGU,a.gpKg],['발주방',a.baljuKg/KGU,a.baljuKg],
   ...CH.map(c=>[c,a.chs[c].conte,a.chs[c].kg])];
  return `<div class="card"><h2>재고현황 <span class="pill">콘테나 19kg 기준</span></h2>
  <table><thead><tr><th class="l">구분</th><th>콘테나</th><th>환산중량(kg)</th></tr></thead><tbody>

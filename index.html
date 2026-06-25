@@ -315,10 +315,10 @@ function bindDrop(){
 function logln(html){const l=document.getElementById('log');if(l.querySelector('.mut'))l.innerHTML='';l.insertAdjacentHTML('afterbegin','<div>'+html+'</div>');}
 function handle(files){[...files].forEach(file=>{const rd=new FileReader();
  rd.onload=e=>{try{ingest(file.name,e.target.result)}catch(err){logln('❌ '+file.name+' : '+err.message)}};
- rd.readAsArrayBuffer(file);});}
+ if(/\.csv$/i.test(file.name)) rd.readAsText(file,'utf-8'); else rd.readAsArrayBuffer(file);});}
 function mergeRecords(existing,incoming,keyFn){var map=new Map();(existing||[]).forEach(function(x){map.set(keyFn(x),x);});var added=0,updated=0;(incoming||[]).forEach(function(x){var k=keyFn(x);if(map.has(k))updated++;else added++;map.set(k,x);});return {merged:Array.from(map.values()),added:added,updated:updated};}
 function ingest(name,buf){
- const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+ const wb=XLSX.read(buf,{type:(typeof buf==='string'?'string':'array')});const ws=wb.Sheets[wb.SheetNames[0]];
  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
  const det=detect(rows.slice(0,6));
  if(!det){logln('⚠️ <b>'+name+'</b> : 채널을 인식하지 못했습니다. (헤더 확인 필요)');return;}

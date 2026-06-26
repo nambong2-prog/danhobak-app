@@ -48,6 +48,26 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 .hide{display:none}
 .note{background:var(--in);border:1px solid #ecd98a;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6}
 @media print{header,nav,.noprint{display:none!important}body{background:#fff}.wrap{max-width:100%;padding:0}.card{border:none}#investorReport h2{margin-top:18px}}
+@media (max-width:640px){
+ header{padding:10px 12px;gap:6px}
+ header h1{font-size:16px}
+ header .sub{display:none}
+ nav{margin-left:0;width:100%;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:3px}
+ nav button{flex:0 0 auto;font-size:12px;padding:7px 11px}
+ .wrap{padding:10px}
+ .card{padding:12px;border-radius:10px;margin-bottom:12px;overflow:hidden}
+ h2{font-size:14px}h3{font-size:12.5px}
+ .kpis{grid-template-columns:repeat(2,1fr);gap:8px}
+ .kpi{padding:10px 11px}
+ .kpi .v{font-size:18px}
+ .scroll{max-height:none}
+ table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}
+ th,td{padding:6px 8px;font-size:12px}
+ .card input,.card select{max-width:100%}
+ .row{gap:8px}
+ #investorReport h1{font-size:20px}
+}
+@media print{table{display:table;white-space:normal}}
 </style>
 </head>
 <body>

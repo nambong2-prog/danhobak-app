@@ -17,7 +17,9 @@ nav button{background:rgba(255,255,255,.12);color:#fff;border:0;padding:8px 13px
 nav button.on{background:#fff;color:var(--g);font-weight:700}
 .wrap{max-width:1180px;margin:0 auto;padding:18px}
 .card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;margin-bottom:16px}
-h2{font-size:15px;margin:0 0 12px;color:var(--g)}
+h2{font-size:16.5px;margin:6px 0 14px;color:var(--ink);font-weight:800;padding-bottom:9px;border-bottom:2px solid #d7e6da;line-height:1.5}
+h2 .pill,h2 .tag{font-weight:700}
+.tnum{display:inline-block;min-width:23px;height:23px;line-height:23px;text-align:center;border-radius:6px;background:var(--g);color:#fff;font-size:13px;font-weight:800;margin-right:9px;padding:0 5px;vertical-align:middle}
 h3{font-size:13px;margin:18px 0 8px;color:var(--g2)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .kpi{background:var(--lg);border-radius:10px;padding:13px 15px}
@@ -316,7 +318,7 @@ const editMode=k=>!!UI.edit[k];
 function toggleEdit(k){UI.edit[k]=!UI.edit[k];render();}
 const editBtn=k=>`<button class="btn ${UI.edit[k]?'':'alt'}" style="padding:5px 12px" onclick="toggleEdit('${k}')">${UI.edit[k]?'✓ 완료':'✏ 수정'}</button>`;
 const TABS=['대시보드','채널 정산','공판','입고·매입','재고','자금현황','손익','사업요약','업로드','동기화'];
-function numberTitles(){var n=0;document.querySelectorAll('#app h2').forEach(function(h){if(h.closest('.noprint'))return;var t=h.innerHTML.replace(/^\s*\d+\.\s*/,'');n++;h.innerHTML=n+'. '+t;});}
+function numberTitles(){var n=0;document.querySelectorAll('#app h2').forEach(function(h){if(h.closest('.noprint'))return;var t=h.innerHTML.replace(/^<span class="tnum">\d+<\/span>\s*/,'').replace(/^\s*\d+\.\s*/,'');n++;h.innerHTML='<span class="tnum">'+n+'</span>'+t;});}
 function render(){
  const stat=ghReady()?`<button onclick="go('동기화')" style="background:#1f7a3a;color:#fff" title="GitHub 연결됨">🟢 연결</button>`:`<button onclick="go('동기화')" title="로컬 전용">⚪ 로컬</button>`;
  document.getElementById('nav').innerHTML=stat+TABS.map(t=>`<button class="${t===TAB?'on':''}" onclick="go('${t}')">${t}</button>`).join('');

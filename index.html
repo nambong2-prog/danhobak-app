@@ -298,14 +298,18 @@ function agg(){
    chs[c]={cnt:arr.length,kg,conte:kg/KGU,sale,fee,pay,hasFee:conf.length>0,pendCnt:pend.length,pendAmt,pendKg};
    chKg+=kg;chSale+=sale;chFee+=fee;chPay+=pay;chPendAmt+=pendAmt;chPendCnt+=pend.length;});
  const outKg=gpKg+baljuKg+chKg, outConte=outKg/KGU;
- const stockConte=ipgoConte-outConte, stockKg=stockConte*KGU;
+ const cureKg=(DB.cureKg!=null?DB.cureKg:1),sortLoss=(DB.sortLoss!=null?DB.sortLoss:0.03);
+ const cureConte=ipgoConte*cureKg/KGU;
+ const sortLossConte=outConte*(1/(1-sortLoss)-1);
+ const stockConte=ipgoConte-cureConte-outConte-sortLossConte, stockKg=stockConte*KGU;
+ const lossConte=cureConte+sortLossConte, lossKg=lossConte*KGU, lossRate=ipgoConte?lossConte/ipgoConte:0;
  const avgKg=ipgoKg?ipgoCost/ipgoKg:0;
  const stockAsset=stockKg*avgKg;
  const rev=gpNet+baljuSale+chSale;
  const cogs=ipgoCost-stockAsset;
  const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
  return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,chPendAmt,chPendCnt,
-   outKg,outConte,stockConte,stockKg,avgKg,stockAsset,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
+   outKg,outConte,stockConte,stockKg,avgKg,stockAsset,cureKg,sortLoss,cureConte,sortLossConte,lossConte,lossKg,lossRate,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
    profit:rev-cogs};
 }
 
@@ -589,17 +593,28 @@ function vCash(){const a=agg();const ed=editMode('cash');const cash=DB.cash||[];
 }
 
 function vStock(){const a=agg();
- const rows=[['총 매입',a.ipgoConte,a.ipgoKg],['도매(공판) 출하',a.gpKg/KGU,a.gpKg],['발주방',a.baljuKg/KGU,a.baljuKg],
-  ...CH.map(c=>[c,a.chs[c].conte,a.chs[c].kg])];
+ const real=DB.realStock;
  return `<div class="card"><h2>재고현황 <span class="pill">콘테나 19kg 기준</span></h2>
  <table><thead><tr><th class="l">구분</th><th>콘테나</th><th>환산중량(kg)</th></tr></thead><tbody>
- ${rows.map((r,i)=>`<tr${i===0?' class="tot"':''}><td class="l">${r[0]}</td><td>${W1(r[1])}</td><td>${W(r[2])}</td></tr>`).join('')}
- <tr class="tot"><td class="l">총 출고·판매</td><td>${W1(a.outConte)}</td><td>${W(a.outKg)}</td></tr>
- <tr class="tot" style="background:#fff2cc!important"><td class="l">현재고(원물)</td><td>${W1(a.stockConte)}</td><td>${W(a.stockKg)}</td></tr>
+ <tr class="tot"><td class="l">총 매입(원물 입고)</td><td>${W1(a.ipgoConte)}</td><td>${W(a.ipgoKg)}</td></tr>
+ <tr><td class="l">(−) 도매(공판) 출하</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpKg)}</td></tr>
+ <tr><td class="l">(−) 발주방</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuKg)}</td></tr>
+ ${CH.map(c=>`<tr><td class="l">(−) ${c}</td><td>${W1(a.chs[c].conte)}</td><td>${W(a.chs[c].kg)}</td></tr>`).join('')}
+ <tr class="tot"><td class="l">출고·판매 합계</td><td>${W1(a.outConte)}</td><td>${W(a.outKg)}</td></tr>
+ <tr><td class="l">(−) 큐어링·보관 감모 <span class="mut" style="font-weight:400">${a.cureKg}kg/콘테나</span></td><td>${W1(a.cureConte)}</td><td>${W(a.cureConte*KGU)}</td></tr>
+ <tr><td class="l">(−) 선별·소분 로스 <span class="mut" style="font-weight:400">판매분 ${(a.sortLoss*100).toFixed(0)}%</span></td><td>${W1(a.sortLossConte)}</td><td>${W(a.sortLossConte*KGU)}</td></tr>
+ <tr class="tot" style="background:#fff2cc!important"><td class="l">= 실재고(추정)</td><td>${W1(a.stockConte)}</td><td>${W(a.stockKg)}</td></tr>
+ <tr><td class="l">총 로스율</td><td>${(a.lossRate*100).toFixed(1)}%</td><td>${W(a.lossKg)}kg (${W1(a.lossConte)}콘테나)</td></tr>
  </tbody></table>
- <div class="row" style="margin-top:12px"><label>상품화율(%) <input type="number" id="seon" value="${Math.round(DB.seon*100)}" onchange="DB.seon=this.value/100;save();render()"></label>
- <span class="mut">추정 상품가능: <b>${W1(a.ipgoConte*DB.seon)}</b> 콘테나</span></div>
- <div class="note" style="margin-top:12px">입고는 19kg 콘테나(원물), 판매는 소포장입니다. 선별·소분 로스와 등급분리는 상품화율로 반영하세요.</div></div>`;
+ <div class="row" style="margin-top:12px">
+   <label>큐어링 감모(kg/콘테나) <input type="number" step="0.1" value="${a.cureKg}" onchange="DB.cureKg=N(this.value);save();render()" style="width:80px"></label>
+   <label>선별 로스(%) <input type="number" value="${+(a.sortLoss*100).toFixed(1)}" onchange="DB.sortLoss=N(this.value)/100;save();render()" style="width:80px"></label>
+ </div>
+ <div class="row" style="margin-top:8px">
+   <label>실사 실재고(콘테나) <input type="number" value="${real!=null?real:''}" placeholder="직접 센 값" onchange="DB.realStock=(this.value===''?null:N(this.value));save();render()" style="width:120px"></label>
+   ${real!=null?`<span class="mut">추정과 차이 <b style="color:${(real-a.stockConte)<0?'#c0392b':'#2E5E3A'}">${(real-a.stockConte)>=0?'+':''}${W1(real-a.stockConte)}</b> 콘테나</span>`:''}
+ </div>
+ <div class="note" style="margin-top:12px"><b>큐어링·보관 감모</b>(저장만 해도 수분이 빠져 무게 감소)는 매입 전량에, <b>선별·소분 로스</b>는 판매(처리)분에 적용해 실재고를 추정합니다. 직접 세어 <b>실사 실재고</b>를 입력하면 추정과의 차이를 확인할 수 있어요.</div></div>`;
 }
 
 function vPnl(){const a=agg();

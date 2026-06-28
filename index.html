@@ -390,6 +390,7 @@ function ingest(name,buf){
  const inc=normalize(channel,rows,hrow);const keyFn=function(x){return (x.order||'')+'||'+(x.opt||'');};const arr0=DB.channels[channel]||[];const map=new Map();arr0.forEach(function(x){map.set(keyFn(x),x);});var added=0,updated=0,kept=0;inc.forEach(function(x){const k=keyFn(x);const ex=map.get(k);if(ex){if(ex.fee!=null&&x.fee==null){kept++;}else{map.set(k,x);updated++;}}else{map.set(k,x);added++;}});const merged=Array.from(map.values());DB.channels[channel]=merged;save();const conf=merged.filter(function(x){return x.fee!=null;});const sale=conf.reduce(function(s,x){return s+x.gross;},0);logln('✅ <b>'+channel+'</b> ('+name+') · 새 '+added+'건 / 갱신 '+updated+'건 / 정산확정 유지 '+kept+'건 → 누적 '+merged.length+'건 (확정매출 '+W(sale)+'원)');
 }
 
+function fmtDate(v){if(v==null||v==='')return '';var s=String(v).trim();if(/^\d{4,6}(\.\d+)?$/.test(s)){var n=Math.floor(parseFloat(s));if(n>20000&&n<80000){return new Date((n-25569)*86400000).toISOString().slice(0,10);}}var m=s.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);return s.slice(0,16);}
 function optAgg(arr){const g={};arr.forEach(x=>{const k=x.boxKg||0;const o=g[k]=g[k]||{cnt:0,boxes:0,kg:0,sale:0,fee:0,pay:0,hasFee:false};
   o.cnt++;o.boxes+=k?Math.round(x.kg/k):0;o.kg+=x.kg;o.sale+=x.gross;if(x.fee!=null){o.fee+=x.fee;o.hasFee=true;}o.pay+=(x.payout||0);});return g;}
 function optTable(g,showFee){const keys=Object.keys(g).map(Number).sort((a,b)=>a-b);
@@ -418,7 +419,7 @@ function vChannels(){
   const k='ch_'+c;
   const detail=UI.open[k]
    ? `<div class="scroll"><table><thead><tr><th class="l">일자</th><th class="l">주문번호</th><th class="l">옵션</th><th>박스kg</th><th>수량</th><th>중량</th><th>콘테나</th><th>판매금</th><th>할인/쿠폰</th><th>수수료</th><th>정산</th></tr></thead><tbody>
-  ${a.map(x=>`<tr><td class="l">${(x.date||'').toString().slice(0,10)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
+  ${a.map(x=>`<tr><td class="l">${fmtDate(x.date)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
   </tbody></table></div>`
    : `<p class="mut" style="margin:6px 0">${a.length}건 줄임 — 펼치기를 누르면 주문 상세가 표시됩니다.</p>`;
   html+=`<div class="card"><h2>${c} <span class="pill">${a.length}건</span>${hasFee?'':'<span class="tag warn">정산대기 · 정산서 올리면 매출 확정</span>'}</h2>
@@ -435,7 +436,7 @@ function vChannels(){
     <td>${inn(x.gross,`setBalju(${i},'gross',this.value)`,90)}</td>
     <td>${stChip(i,x)}</td>
     <td><button class="btn warn" style="padding:3px 8px" onclick="delBalju(${i})">삭제</button></td></tr>`
-   :`<tr><td class="l">${(x.date||'').toString().slice(0,10)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${W(x.gross)}</td><td>${stChip(i,x)}</td><td></td></tr>`).join('');
+   :`<tr><td class="l">${fmtDate(x.date)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${W(x.gross)}</td><td>${stChip(i,x)}</td><td></td></tr>`).join('');
   const thStatus=`<th><button onclick="cycleBaljuFilter()" title="클릭: 상태별 보기" style="background:none;border:0;color:#fff;cursor:pointer;font:inherit;font-weight:600">상태 ${flt==='전체'?'▾':'('+flt+') ✕'}</button></th>`;
   const detail=UI.open[k]
    ? `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px"><span class="mut">${flt==='전체'?'전체':flt+'만'} ${filtered.length}건 표시</span>${editBtn('balju')}</div>

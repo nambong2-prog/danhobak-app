@@ -126,23 +126,24 @@ function detect(hdrRows){
 function normalize(channel, rows, hrow){
   const hdr=rows[hrow], m=colmap(hdr); const out=[];
   const get=(r,names)=>{const i=pick(m,names);return i<0?'':r[i]};
+  const getNE=(r,names)=>{for(var j=0;j<names.length;j++){const i=pick(m,[names[j]]);if(i>=0&&r[i]!=null&&String(r[i]).trim()!=='')return r[i];}return '';};
   for(let r=hrow+1;r<rows.length;r++){
     const row=rows[r]; if(!row||row.every(c=>c==null||c===''))continue;
     const c0=String(row[0]||'');
     if(c0.startsWith('수정 ')||c0.startsWith('◈')||c0.startsWith('📍'))continue; // 안내/주석행
     let rec={channel};
     if(channel==='쿠팡'){
-      rec.date=get(row,['출고일(발송일)','주문일']); rec.order=get(row,['주문번호']);
+      rec.date=getNE(row,['출고일(발송일)','주문일']); rec.order=get(row,['주문번호']);
       rec.opt=get(row,['등록옵션명','노출상품명(옵션명)']); rec.qty=N(get(row,['구매수(수량)']))||1;
       rec.gross=N(get(row,['결제액'])); rec.disc=0; rec.fee=null; rec.payout=null; rec.feeNote='별도정산서';
     }else if(channel==='스마트스토어'){
-      rec.date=get(row,['주문일시','발송일','결제일']); rec.order=get(row,['상품주문번호','주문번호']);
+      rec.date=getNE(row,['주문일시','발송일','결제일']); rec.order=get(row,['상품주문번호','주문번호']);
       rec.opt=get(row,['옵션정보','판매옵션정보','상품명']); rec.qty=N(get(row,['수량']))||1;
       rec.gross=N(get(row,['최종 상품별 총 주문금액','상품가격','결제금액'])); rec.disc=N(get(row,['최종 상품별 할인액']));
       if(pick(m,['정산예정금액'])>=0){rec.fee=Math.abs(N(get(row,['네이버페이 주문관리 수수료']))+N(get(row,['매출연동 수수료'])));rec.payout=N(get(row,['정산예정금액']));}
       else{rec.fee=null;rec.payout=null;rec.feeNote='정산대기';}
     }else if(channel==='토스'){
-      rec.date=get(row,['결제일시','주문일시']); rec.order=get(row,['주문번호']); rec.spo=get(row,['주문상품번호','상품 주문번호']);
+      rec.date=getNE(row,['결제일시','주문일시']); rec.order=get(row,['주문번호']); rec.spo=get(row,['주문상품번호','상품 주문번호']);
       rec.opt=get(row,['옵션명']); rec.qty=N(get(row,['주문수량','주문건수']))||1;
       if(pick(m,['수수료 합계'])>=0){ // 토스 정산내역
         if(!rec.opt||String(get(row,['상품명'])).trim()==='배송비')continue; // 배송비 행 제외
@@ -154,7 +155,7 @@ function normalize(channel, rows, hrow){
         rec.gross=N(get(row,['주문금액'])); rec.disc=0; rec.fee=null; rec.payout=null; rec.feeNote='별도정산서';
       }
     }else if(channel==='톡스토어'){
-      rec.date=get(row,['발송요청일','주문일']); rec.order=get(row,['주문번호']);
+      rec.date=getNE(row,['발송요청일','주문일']); rec.order=get(row,['주문번호']);
       rec.opt=get(row,['옵션']); rec.qty=N(get(row,['수량']))||1;
       rec.gross=N(get(row,['상품금액'])); rec.disc=N(get(row,['판매자할인금액']))+N(get(row,['판매자쿠폰할인금액']));
       const settle=N(get(row,['정산기준금액']));
@@ -165,7 +166,7 @@ function normalize(channel, rows, hrow){
  if(channel==='토스정산'){const recs=parseTossSettle(rows,hrow);const cp=DB.channels['토스']||[];const idx={};cp.forEach((x,i)=>{[String(x.spo||''),String(x.order||'')].forEach(k=>{if(k)(idx[k]=idx[k]||[]).push(i);});});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.spo)]||idx[String(sx.ono)];if(arr&&arr.length){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['토스']=cp;save();logln('✅ <b>토스 정산 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
  if(channel==='발주방'){
       rec.channel='발주방';
-      rec.date=get(row,['주문일시']); rec.order=get(row,['받는 사람 이름']);
+      rec.date=getNE(row,['주문일시']); rec.order=get(row,['받는 사람 이름']);
       rec.payer=String(get(row,['입금자(주문자)','입금자'])||'').trim();
       rec.opt=get(row,['옵션 이름']); rec.qty=N(get(row,['상품 수량']))||1;
       rec.gross=N(get(row,['주문금액'])); rec.depRaw=String(get(row,['입금액'])||'').trim();
@@ -391,6 +392,7 @@ function ingest(name,buf){
 }
 
 function fmtDate(v){if(v==null||v==='')return '';var s=String(v).trim();if(/^\d{4,6}(\.\d+)?$/.test(s)){var n=Math.floor(parseFloat(s));if(n>20000&&n<80000){return new Date((n-25569)*86400000).toISOString().slice(0,10);}}var m=s.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);return s.slice(0,16);}
+function _byDate(p,q){var a=fmtDate(p.date||''),b=fmtDate(q.date||'');return a>b?-1:a<b?1:0;}
 function optAgg(arr){const g={};arr.forEach(x=>{const k=x.boxKg||0;const o=g[k]=g[k]||{cnt:0,boxes:0,kg:0,sale:0,fee:0,pay:0,hasFee:false};
   o.cnt++;o.boxes+=k?Math.round(x.kg/k):0;o.kg+=x.kg;o.sale+=x.gross;if(x.fee!=null){o.fee+=x.fee;o.hasFee=true;}o.pay+=(x.payout||0);});return g;}
 function optTable(g,showFee){const keys=Object.keys(g).map(Number).sort((a,b)=>a-b);
@@ -419,7 +421,7 @@ function vChannels(){
   const k='ch_'+c;
   const detail=UI.open[k]
    ? `<div class="scroll"><table><thead><tr><th class="l">일자</th><th class="l">주문번호</th><th class="l">옵션</th><th>박스kg</th><th>수량</th><th>중량</th><th>콘테나</th><th>판매금</th><th>할인/쿠폰</th><th>수수료</th><th>정산</th></tr></thead><tbody>
-  ${a.map(x=>`<tr><td class="l">${fmtDate(x.date)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
+  ${a.slice().sort(_byDate).map(x=>`<tr><td class="l">${fmtDate(x.date)}</td><td class="l">${x.order||''}</td><td class="l">${x.opt||''}</td><td>${x.boxKg||0}</td><td>${x.qty}</td><td>${W(x.kg)}</td><td>${W1(x.conte)}</td><td>${W(x.gross)}</td><td>${W(x.disc)}</td><td>${x.fee!=null?W(x.fee):'-'}</td><td>${x.payout!=null?W(x.payout):'-'}</td></tr>`).join('')}
   </tbody></table></div>`
    : `<p class="mut" style="margin:6px 0">${a.length}건 줄임 — 펼치기를 누르면 주문 상세가 표시됩니다.</p>`;
   html+=`<div class="card"><h2>${c} <span class="pill">${a.length}건</span>${hasFee?'':'<span class="tag warn">정산대기 · 정산서 올리면 매출 확정</span>'}</h2>
@@ -428,7 +430,7 @@ function vChannels(){
   ${detail}</div>`;});
  // 발주방 (발주방) — 상태 변경 가능
  if(DB.balju.length){const edB=editMode('balju');const k='baljuD';const flt=UI.baljuF||'전체';
-  const filtered=DB.balju.map((x,i)=>({x,i})).filter(o=>flt==='전체'||(o.x.status||'입금완료')===flt);
+  const filtered=DB.balju.map((x,i)=>({x,i})).filter(o=>flt==='전체'||(o.x.status||'입금완료')===flt).sort(function(m,n){var d1=fmtDate(m.x.date||''),d2=fmtDate(n.x.date||'');return d1>d2?-1:d1<d2?1:0;});
   const dRows=filtered.map(({x,i})=>edB?`<tr>
     <td>${inp(x.date,`setBalju(${i},'date',this.value)`,80)}</td>
     <td>${inp(x.order,`setBalju(${i},'order',this.value)`,90)}</td>

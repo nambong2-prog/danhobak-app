@@ -270,8 +270,10 @@ function agg(){
  const ipgoKg=ipgoConte*KGU;
  const ipgoCost=DB.ipgo.reduce((s,x)=>s+x.conte*KGU*x.priceKg,0);
  const cKg=DB.gpCostKg||1600;
- let gpKg=0,gpNet=0,gpSettledKg=0;
- DB.gongpan.forEach(x=>{const kg=(x.boxKg||0)*(x.boxes||0);gpKg+=kg;if(x.net!=null){gpNet+=x.net;gpSettledKg+=kg;}});
+ let gpKg=0,gpNet=0,gpSettledKg=0,gpBox=0,gpAucNet=0,gpAucBox=0,gpAucKg=0,gpDirNet=0,gpDirBox=0,gpDirKg=0;
+ DB.gongpan.forEach(x=>{const kg=(x.boxKg||0)*(x.boxes||0),bx=(x.boxes||0);gpKg+=kg;gpBox+=bx;if(x.net!=null){gpNet+=x.net;gpSettledKg+=kg;}
+   const t=(x.type||(String(x.market||'').indexOf('올탑')>=0?'도매':'공판'));
+   if(t==='도매'){gpDirKg+=kg;gpDirBox+=bx;if(x.net!=null)gpDirNet+=x.net;}else{gpAucKg+=kg;gpAucBox+=bx;if(x.net!=null)gpAucNet+=x.net;}});
  const gpCost=gpSettledKg*cKg, gpMargin=gpNet-gpCost, gpMrate=gpNet?gpMargin/gpNet:0;
  const baljuKg=DB.balju.reduce((s,x)=>s+x.kg,0);
  let baljuPaidSale=0,baljuMisu=0,baljuService=0,baljuServiceKg=0,cPaid=0,cMisu=0,cSvc=0;
@@ -309,7 +311,7 @@ function agg(){
  const rev=gpNet+baljuSale+chSale;
  const cogs=ipgoCost-stockAsset;
  const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
- return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,chPendAmt,chPendCnt,
+ return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,gpBox,gpAucNet,gpAucBox,gpAucKg,gpDirNet,gpDirBox,gpDirKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,chPendAmt,chPendCnt,
    outKg,outConte,stockConte,stockKg,avgKg,stockAsset,cureKg,sortLoss,cureConte,sortLossConte,lossConte,lossKg,lossRate,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
    profit:rev-cogs};
 }
@@ -514,21 +516,22 @@ function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup')
  <div class="note" style="margin-top:10px">미지급 잔액 = 매입액 − 지급액. <b>산양</b>은 가져온 날(6/10) 전액 현금지급 처리했습니다.</div></div>`;
 }
 
-function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();render();}
+function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market'||f==='type')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();render();}
 function addGp(){DB.gongpan.push({date:'',market:'',boxKg:3,boxes:0,net:null});save();render();}
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
 function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
- const rows=DB.gongpan.map((x,i)=>{const kg=(x.boxKg||0)*(x.boxes||0);const cost=kg*cKg;const pbCost=(x.boxKg||0)*cKg;
+ const rows=DB.gongpan.map((x,i)=>{const kg=(x.boxKg||0)*(x.boxes||0);const gt=x.type||(String(x.market||'').indexOf('올탑')>=0?'도매':'공판');const cost=kg*cKg;const pbCost=(x.boxKg||0)*cKg;
    const pbNet=(x.net!=null&&x.boxes)?x.net/x.boxes:null;const kgNet=(x.net!=null&&kg)?x.net/kg:null;
    const pbMar=pbNet!=null?pbNet-pbCost:null;const rowMar=x.net!=null?x.net-cost:null;
    const c1=ed?`<td>${inp(x.date,`setGp(${i},'date',this.value)`,70)}</td>
    <td>${inp(x.market,`setGp(${i},'market',this.value)`,130)}</td>
+   <td><select onchange="setGp(${i},'type',this.value)" style="width:62px"><option ${gt==='공판'?'selected':''}>공판</option><option ${gt==='도매'?'selected':''}>도매</option></select></td>
    <td>${inn(x.boxKg,`setGp(${i},'boxKg',this.value)`,52)}</td>
    <td>${inn(x.boxes,`setGp(${i},'boxes',this.value)`,64)}</td>
    <td>${W(kg)}</td>
    <td><input type="text" inputmode="numeric" value="${fmtN(x.net)}" oninput="liveComma(this)" onchange="setGp(${i},'net',this.value)" style="width:110px;text-align:right" placeholder="정산 대기"></td>`
-   :`<td class="l">${x.date||''}</td><td class="l">${x.market||''}</td><td>${W(x.boxKg)}</td><td>${W(x.boxes)}</td><td>${W(kg)}</td><td>${x.net==null?'<span class="tag warn">대기</span>':W(x.net)}</td>`;
+   :`<td class="l">${x.date||''}</td><td class="l">${x.market||''}</td><td><span class="tag ${gt==='도매'?'warn':'ok'}">${gt}</span></td><td>${W(x.boxKg)}</td><td>${W(x.boxes)}</td><td>${W(kg)}</td><td>${x.net==null?'<span class="tag warn">대기</span>':W(x.net)}</td>`;
    return `<tr>${c1}
    <td>${kgNet==null?'-':W(kgNet)}</td>
    <td>${pbNet==null?'-':W(pbNet)}</td>
@@ -538,6 +541,12 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
    <td>${ed?`<button class="btn warn" style="padding:3px 8px" onclick="delGp(${i})">삭제</button>`:''}</td></tr>`}).join('');
  return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">공판(도매) 출하·정산·마진</h2>${editBtn('gongpan')}</div>
  <div class="kpis" style="margin:12px 0">
+   ${kpi('공판장 정산액',W(a.gpAucNet),'원')}
+   ${kpi('공판장 박스수',W(a.gpAucBox),'박스')}
+   ${kpi('도매 정산액',W(a.gpDirNet),'원')}
+   ${kpi('도매 박스수',W(a.gpDirBox),'박스')}
+ </div>
+ <div class="kpis" style="margin:0 0 12px">
    ${kpi('총 정산액',W(a.gpNet),'원')}
    ${kpi('총 매입원가',W(a.gpCost),'원 ('+W(a.gpSettledKg)+'kg×'+W(cKg)+')')}
    ${kpi('총 마진',W(a.gpMargin),'원')}
@@ -545,9 +554,9 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
  </div>
  <div class="row" style="margin-bottom:10px"><label>매입단가(원/kg) ${ed?`<input type="text" inputmode="numeric" value="${fmtN(cKg)}" oninput="liveComma(this)" onchange="DB.gpCostKg=N(this.value);save();render()" style="text-align:right">`:`<b>${W(cKg)}</b>`}</label>
  <span class="mut">예) 3kg 박스 매입원가 = 3 × ${W(cKg)} = ${W(3*cKg)}원 / 18kg = ${W(18*cKg)}원</span></div>
- <div class="scroll"><table><thead><tr><th>출고일</th><th>시장·도매법인</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead><tbody>
+ <div class="scroll"><table><thead><tr><th>출고일</th><th>시장·도매법인</th><th>구분</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead><tbody>
  ${rows}
- <tr class="tot"><td>합계</td><td></td><td></td><td></td><td>${W(a.gpKg)}</td><td>${W(a.gpNet)}</td><td></td><td></td><td>${W(a.gpCost)}</td><td></td><td>${sg(a.gpMargin)}</td><td></td></tr>
+ <tr class="tot"><td>합계</td><td></td><td></td><td></td><td></td><td>${W(a.gpKg)}</td><td>${W(a.gpNet)}</td><td></td><td></td><td>${W(a.gpCost)}</td><td></td><td>${sg(a.gpMargin)}</td><td></td></tr>
  </tbody></table></div>
  ${ed?`<button class="btn" style="margin-top:8px" onclick="addGp()">＋ 공판 출하 추가</button>`:'<p class="mut" style="margin:6px 0">값을 바꾸려면 [✏ 수정]을 누르세요.</p>'}
  <div class="note" style="margin-top:10px">규격(박스kg)·박스수만 넣으면 중량은 자동(규격×박스수). 정산액을 넣으면 <b>역산</b>으로 kg당·박스당 정산이 계산되고, 매입단가(${W(cKg)}원/kg)로 박스당 원가·마진·총마진이 나옵니다.</div></div>`;

@@ -327,6 +327,7 @@ const editBtn=k=>`<button class="btn ${UI.edit[k]?'':'alt'}" style="padding:5px 
 const TABS=['대시보드','채널 정산','공판','입고·매입','재고','자금현황','손익','사업요약','업로드','동기화'];
 function numberTitles(){var n=0;document.querySelectorAll('#app h2').forEach(function(h){if(h.closest('.noprint'))return;var t=h.innerHTML.replace(/^<span class="tnum">\d+<\/span>\s*/,'').replace(/^\s*\d+\.\s*/,'');n++;h.innerHTML='<span class="tnum">'+n+'</span>'+t;});}
 function render(){
+ const _sy=window.scrollY;
  const stat=ghReady()?`<button onclick="go('동기화')" style="background:#1f7a3a;color:#fff" title="GitHub 연결됨">🟢 연결</button>`:`<button onclick="go('동기화')" title="로컬 전용">⚪ 로컬</button>`;
  document.getElementById('nav').innerHTML=stat+TABS.map(t=>`<button class="${t===TAB?'on':''}" onclick="go('${t}')">${t}</button>`).join('');
  document.getElementById('app').innerHTML=({
@@ -334,8 +335,9 @@ function render(){
  })[TAB]();
  if(TAB==='업로드')bindDrop();
  numberTitles();
+ window.scrollTo(0,_sy);
 }
-function go(t){TAB=t;render();}
+function go(t){TAB=t;render();window.scrollTo(0,0);}
 
 function vDash(){const a=agg();
  return `<div class="card"><h2>핵심 지표</h2><div class="kpis">
@@ -406,7 +408,7 @@ function optTable(g,showFee){const keys=Object.keys(g).map(Number).sort((a,b)=>a
 const ST_NEXT={입금완료:'미수',미수:'서비스',서비스:'입금완료'};
 const ST_COLOR={입금완료:'#2E5E3A',미수:'#c0392b',서비스:'#7a8a7e'};
 function cycleStatus(i){const x=DB.balju[i];x.status=ST_NEXT[x.status||'입금완료'];x.payout=(x.status==='서비스'?0:x.gross);save();render();}
-function setBalju(i,f,v){const x=DB.balju[i];if(f==='gross'){x.gross=N(v);x.payout=(x.status==='서비스'?0:x.gross);}else x[f]=v;save();render();}
+function setBalju(i,f,v){const x=DB.balju[i];if(f==='gross'){x.gross=N(v);x.payout=(x.status==='서비스'?0:x.gross);}else x[f]=v;save();}
 function delBalju(i){DB.balju.splice(i,1);save();render();}
 function cycleBaljuFilter(){const o=['전체','미수','서비스','입금완료'];UI.baljuF=o[(o.indexOf(UI.baljuF||'전체')+1)%o.length];render();}
 function addBalju(){DB.balju.push({channel:'발주방',date:'',order:'',opt:'',qty:1,boxKg:0,kg:0,conte:0,gross:0,disc:0,fee:0,payout:0,status:'입금완료'});save();render();}
@@ -458,10 +460,10 @@ function vChannels(){
  return html;
 }
 
-function setIpgo(i,f,v){DB.ipgo[i][f]=(f==='farm'||f==='date')?v:N(v);save();render();}
+function setIpgo(i,f,v){DB.ipgo[i][f]=(f==='farm'||f==='date')?v:N(v);save();}
 function addIpgo(){DB.ipgo.push({date:'',farm:'현상수',conte:0,priceKg:1600});save();render();}
 function delIpgo(i){DB.ipgo.splice(i,1);save();render();}
-function setJig(i,f,v){DB.jigeup[i][f]=(f==='amt')?N(v):v;save();render();}
+function setJig(i,f,v){DB.jigeup[i][f]=(f==='amt')?N(v):v;save();}
 function addJig(){DB.jigeup.push({date:'',farm:'현상수',amt:0});save();render();}
 function delJig(i){DB.jigeup.splice(i,1);save();render();}
 const fmtN=v=>(v==null||v==='')?'':Number(v).toLocaleString();
@@ -516,7 +518,7 @@ function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup')
  <div class="note" style="margin-top:10px">미지급 잔액 = 매입액 − 지급액. <b>산양</b>은 가져온 날(6/10) 전액 현금지급 처리했습니다.</div></div>`;
 }
 
-function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market'||f==='type')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();render();}
+function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market'||f==='type')x[f]=v;else if(f==='net')x[f]=(v===''?null:N(v));else x[f]=N(v);save();}
 function addGp(){DB.gongpan.push({date:'',market:'',boxKg:3,boxes:0,net:null});save();render();}
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;

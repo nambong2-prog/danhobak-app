@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='210';
+<script>window.__BUILD__='211';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -392,6 +392,7 @@ function ingest(name,buf){
  if(channel==='입고'){const inc=parseIpgo(rows,hrow);const r=mergeRecords(DB.ipgo||[],inc,function(x){return [x.date,x.farm,x.conte,x.priceKg].join('|');});DB.ipgo=r.merged;save();logln('✅ <b>입고</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+DB.ipgo.length+'건');render();go('업로드');return;}
  if(channel==='입금'){const inc=parseIpgeum(rows,hrow).map(function(x){return {date:x.date,type:'입금',cat:'입금(업로드)',memo:x.who,amt:x.amt,src:'up'};});const existUp=(DB.cash||[]).filter(function(x){return x.src==='up';});const r=mergeRecords(existUp,inc,function(x){return [x.date,x.memo,x.amt].join('|');});DB.cash=(DB.cash||[]).filter(function(x){return x.src!=='up';}).concat(r.merged);save();logln('✅ <b>입금 업로드</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+r.merged.length+'건');render();return;}
  if(channel==='발주방'){const a=classifyBalju(normalize('발주방',rows,hrow));DB.balju=a;save();const c={입금완료:0,서비스:0,미수:0};a.forEach(function(x){c[x.status]=(c[x.status]||0)+1;});logln('✅ <b>발주방</b> ('+name+') · 전체 교체 '+a.length+'건 (입금완료 '+c.입금완료+'/서비스 '+c.서비스+'/미수 '+c.미수+')');render();return;}
+ if(channel==='쿠팡정산'||channel==='스마트스토어정산'||channel==='토스정산'){normalize(channel,rows,hrow);return;}
  const inc=normalize(channel,rows,hrow);const keyFn=function(x){return (x.order||'')+'||'+(x.opt||'');};const arr0=DB.channels[channel]||[];const map=new Map();arr0.forEach(function(x){map.set(keyFn(x),x);});var added=0,updated=0,kept=0;inc.forEach(function(x){const k=keyFn(x);const ex=map.get(k);if(ex){if(ex.fee!=null&&x.fee==null){kept++;}else{map.set(k,x);updated++;}}else{map.set(k,x);added++;}});const merged=Array.from(map.values());DB.channels[channel]=merged;save();const conf=merged.filter(function(x){return x.fee!=null;});const sale=conf.reduce(function(s,x){return s+x.gross;},0);logln('✅ <b>'+channel+'</b> ('+name+') · 새 '+added+'건 / 갱신 '+updated+'건 / 정산확정 유지 '+kept+'건 → 누적 '+merged.length+'건 (확정매출 '+W(sale)+'원)');
 }
 

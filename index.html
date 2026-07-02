@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='211';
+<script>window.__BUILD__='212';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -366,7 +366,7 @@ function vUpload(){return `<div class="card"><h2>파일 업로드 <span class="p
  <input id="file" type="file" accept=".xlsx,.xls,.csv" multiple class="hide"></div>
  <div class="row" style="margin-top:12px"><button class="btn alt" onclick="exportXlsx()">⬇ 통합 엑셀 내보내기(백업)</button>
  <button class="btn warn" onclick="reset()">초기화</button></div>
- <h3>처리 로그</h3><div id="log" class="log"><div class="mut">대기 중…</div></div>
+ <h3>처리 로그</h3><div id="log" class="log">${LOGS.length?LOGS.map(function(h){return '<div>'+h+'</div>';}).join(''):'<div class="mut">대기 중…</div>'}</div>
  <div class="note" style="margin-top:12px"><b>쿠팡·스마트스토어·토스·톡스토어</b>는 올릴 때마다 <b>누적</b>(같은 주문 중복 자동제거)됩니다. <b>발주방</b>은 올린 CSV로 <b>전체 교체</b>되니, 항상 시트에서 받은 <b>전체 발주방 CSV</b>를 올리세요(빠진 건 사라지고 추가·변경분이 그대로 반영).</div>
  </div>`;}
 
@@ -378,7 +378,7 @@ function bindDrop(){
  d.ondrop=e=>{e.preventDefault();d.classList.remove('hot');handle(e.dataTransfer.files)};
  f.onchange=e=>handle(e.target.files);
 }
-function logln(html){const l=document.getElementById('log');if(l.querySelector('.mut'))l.innerHTML='';l.insertAdjacentHTML('afterbegin','<div>'+html+'</div>');}
+var LOGS=[];function logln(html){LOGS.unshift(html);const l=document.getElementById('log');if(l)l.innerHTML=LOGS.map(function(h){return '<div>'+h+'</div>';}).join('');}
 function handle(files){[...files].forEach(file=>{const rd=new FileReader();
  rd.onload=e=>{try{ingest(file.name,e.target.result)}catch(err){logln('❌ '+file.name+' : '+err.message)}};
  if(/\.csv$/i.test(file.name)) rd.readAsText(file,'utf-8'); else rd.readAsArrayBuffer(file);});}

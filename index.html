@@ -49,7 +49,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 .pill{font-size:11px;padding:2px 7px;border-radius:6px;background:#eef4ef;color:var(--g2);margin-left:6px}
 .hide{display:none}
 .note{background:var(--in);border:1px solid #ecd98a;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6}
-@media print{header,nav,.noprint{display:none!important}body{background:#fff}.wrap{max-width:100%;padding:0}.card{border:none}#investorReport h2{margin-top:18px}}
+@media print{header,nav,.noprint{display:none!important}body{background:#fff}.wrap{max-width:100%;padding:0}.card{border:none}#investorReport h2{margin-top:18px}#investorReport h2.pgb{page-break-before:always;break-before:page}#investorReport table,#investorReport .kpis{page-break-inside:avoid}}
 @media (max-width:640px){
  header{padding:10px 12px;gap:6px}
  header h1{font-size:16px}
@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='217';
+<script>window.__BUILD__='218';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -693,7 +693,7 @@ function vInvestor(){const a=agg();
   ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.pendCnt?'<span class="tag warn">정산대기 '+s.pendCnt+'건</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${(s.sale/rev*100).toFixed(1)}%</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`;}).join('')}
   <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>100%</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr></tbody></table>
 
-  <h2>2. 손익계산서 (요약)</h2>
+  <h2 class="pgb">2. 손익계산서 (요약)</h2>
   <table><thead><tr><th class="l">항목</th><th>금액(원)</th><th>비율</th></tr></thead><tbody>
    <tr><td class="l">매출액</td><td>${W(a.rev)}</td><td>100%</td></tr>
    <tr><td class="l" style="padding-left:22px;color:#666">(−) 매출원가(판매분)</td><td>(${W(a.cogs)})</td><td>${(a.cogs/rev*100).toFixed(1)}%</td></tr>

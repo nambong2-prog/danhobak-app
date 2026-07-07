@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='214';
+<script>window.__BUILD__='215';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -524,7 +524,7 @@ function addGp(){DB.gongpan.push({date:'',market:'',boxKg:3,boxes:0,net:null});s
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
 function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
- const rows=DB.gongpan.map((x,i)=>{const kg=(x.boxKg||0)*(x.boxes||0);const gt=x.type||(String(x.market||'').indexOf('올탑')>=0?'도매':'공판');const rck=(+x.costKg)||cKg;const cost=kg*rck;const pbCost=(x.boxKg||0)*rck;
+ const _dk=d=>{const m=String(d||'').match(/(\d{1,2})[\/.\-](\d{1,2})/);return m?(+m[1])*100+(+m[2]):0;};const rows=DB.gongpan.map((x,i)=>({x,i})).sort((A,B)=>_dk(A.x.date)-_dk(B.x.date)).map(({x,i})=>{const kg=(x.boxKg||0)*(x.boxes||0);const gt=x.type||(String(x.market||'').indexOf('올탑')>=0?'도매':'공판');const rck=(+x.costKg)||cKg;const cost=kg*rck;const pbCost=(x.boxKg||0)*rck;
    const pbNet=(x.net!=null&&x.boxes)?x.net/x.boxes:null;const kgNet=(x.net!=null&&kg)?x.net/kg:null;
    const pbMar=pbNet!=null?pbNet-pbCost:null;const rowMar=x.net!=null?x.net-cost:null;
    const c1=ed?`<td>${inp(x.date,`setGp(${i},'date',this.value)`,70)}</td>
@@ -558,7 +558,7 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
  </div>
  <div class="row" style="margin-bottom:10px"><label>매입단가(원/kg) ${ed?`<input type="text" inputmode="numeric" value="${fmtN(cKg)}" oninput="liveComma(this)" onchange="DB.gpCostKg=N(this.value);save();render()" style="text-align:right">`:`<b>${W(cKg)}</b>`}</label>
  <span class="mut">예) 3kg 박스 매입원가 = 3 × ${W(cKg)} = ${W(3*cKg)}원 / 18kg = ${W(18*cKg)}원</span></div>
- <div class="scroll"><table><thead><tr><th>출고일</th><th>시장·도매법인</th><th>구분</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>원가/kg</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead><tbody>
+ <div class="scroll"><table><thead><tr><th>거래일</th><th>시장·도매법인</th><th>구분</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>원가/kg</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead><tbody>
  ${rows}
  <tr class="tot"><td>합계</td><td></td><td></td><td></td><td></td><td>${W(a.gpKg)}</td><td>${W(a.gpNet)}</td><td></td><td></td><td></td><td>${W(a.gpCost)}</td><td></td><td>${sg(a.gpMargin)}</td><td></td></tr>
  </tbody></table></div>
@@ -666,7 +666,7 @@ function vInvestor(){const a=agg();
    <p style="margin:4px 0 0;color:var(--mut)">사업 현황 요약 · ${today} 기준</p></div>
 
   <h2>매입 &amp; 판매 물량</h2>
-  <div class="kpis" style="margin-bottom:10px">${kpi('총 매입',W(a.ipgoKg),'kg · '+W1(a.ipgoConte)+'콘테나')}${kpi('매입액',W(a.ipgoCost),'원')}${kpi('총 판매',W(a.outKg),'kg · '+W1(a.outConte)+'콘테나')}${kpi('남은 재고',W(a.stockKg),'kg · '+W1(a.stockConte)+'콘테나')}</div>
+  <div class="kpis" style="margin-bottom:10px">${kpi('총 매입',W(a.ipgoKg)+'<span style="font-size:0.55em">kg</span>',W1(a.ipgoConte)+'콘테나')}${kpi('매입액',W(a.ipgoCost),'원')}${kpi('총 판매',W(a.outKg)+'<span style="font-size:0.55em">kg</span>',W1(a.outConte)+'콘테나')}${kpi('남은 재고',W(a.stockKg)+'<span style="font-size:0.55em">kg</span>',W1(a.stockConte)+'콘테나')}</div>
   <table><thead><tr><th class="l">구분</th><th>중량(kg)</th><th>콘테나</th><th>금액(원)</th><th>비고</th></tr></thead><tbody>
    <tr><td class="l">매입(입고)</td><td>${W(a.ipgoKg)}</td><td>${W1(a.ipgoConte)}</td><td>${W(a.ipgoCost)}</td><td class="l">농가 매입 원가</td></tr>
    <tr><td class="l">판매(출고)</td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td class="l">소진율 ${a.ipgoKg?(a.outKg/a.ipgoKg*100).toFixed(1):'-'}%</td></tr>
@@ -675,7 +675,7 @@ function vInvestor(){const a=agg();
   </tbody></table>
 
   <h2>1. 매출 &amp; 채널 구성</h2>
-  <div class="kpis" style="margin-bottom:10px">${kpi('총 매출',W(a.rev),'원')}${kpi('판매 채널',chans.length,'개 채널')}${kpi('취급 물량',W(a.ipgoKg),'kg · '+W1(a.ipgoConte)+'콘테나')}</div>
+  <div class="kpis" style="margin-bottom:10px">${kpi('총 매출',W(a.rev),'원')}${kpi('판매 채널',chans.length,'개 채널')}${kpi('취급 물량',W(a.ipgoKg)+'<span style="font-size:0.55em">kg</span>',W1(a.ipgoConte)+'콘테나')}</div>
   <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>비중</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
   <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>${(a.gpNet/rev*100).toFixed(1)}%</td><td>-</td><td>${W(a.gpNet)}</td></tr>
   <tr><td class="l">발주방</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>${(a.baljuSale/rev*100).toFixed(1)}%</td><td>-</td><td>${W(a.baljuSale)}</td></tr>

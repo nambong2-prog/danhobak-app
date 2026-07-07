@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='216';
+<script>window.__BUILD__='217';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -103,6 +103,7 @@ const SIG={ // 채널 자동인식용 시그니처 헤더
  쿠팡정산:['판매수수료','정산금액'],
  스마트스토어:['상품주문번호','옵션정보'],
  스마트스토어정산:['상품주문번호','수수료금액'],
+ 스마트스토어정산2:['정산기준금액','정산예정금액'],
  토스:['주문상품번호','받은 혜택'],
  토스정산:['수수료 합계','정산금액'],
  톡스토어:['정산기준금액','판매자쿠폰할인금액'],
@@ -163,6 +164,7 @@ function normalize(channel, rows, hrow){
       rec.payout=settle-rec.fee; rec.settle=settle;
     }else if(channel==='쿠팡정산'){const recs=parseCoupangSettle(rows,hrow);const cp=DB.channels['쿠팡']||[];const idx={};cp.forEach((x,i)=>{(idx[String(x.order)]=idx[String(x.order)]||[]).push(i);});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.order)];if(arr){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['쿠팡']=cp;save();logln('✅ <b>쿠팡 정산 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
  if(channel==='스마트스토어정산'){const recs=parseSmartSettle(rows,hrow);const cp=DB.channels['스마트스토어']||[];const idx={};cp.forEach((x,i)=>{(idx[String(x.order)]=idx[String(x.order)]||[]).push(i);});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.order)];if(arr){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['스마트스토어']=cp;save();logln('✅ <b>스마트스토어 정산 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
+ if(channel==='스마트스토어정산2'){const recs=parseSmartSettle2(rows,hrow);const cp=DB.channels['스마트스토어']||[];const idx={};cp.forEach((x,i)=>{[String(x.order||''),String(x.spo||'')].forEach(k=>{if(k)(idx[k]=idx[k]||[]).push(i);});});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.order)]||idx[String(sx.ono)];if(arr&&arr.length){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['스마트스토어']=cp;save();logln('✅ <b>스마트스토어 정산(건별) 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
  if(channel==='토스정산'){const recs=parseTossSettle(rows,hrow);const cp=DB.channels['토스']||[];const idx={};cp.forEach((x,i)=>{[String(x.spo||''),String(x.order||'')].forEach(k=>{if(k)(idx[k]=idx[k]||[]).push(i);});});let matched=0,unmatched=0;recs.forEach(sx=>{const arr=idx[String(sx.spo)]||idx[String(sx.ono)];if(arr&&arr.length){arr.forEach(i=>{const x=cp[i];x.gross=sx.amt;x.fee=sx.fee;x.payout=sx.settle;x.disc=0;if('feeNote' in x)delete x.feeNote;});matched++;}else unmatched++;});DB.channels['토스']=cp;save();logln('✅ <b>토스 정산 매칭</b> ('+name+') · 확정 '+matched+'건 / 미매칭 '+unmatched+'건 (앱에 없는 주문은 무시)');render();return;}
  if(channel==='발주방'){
       rec.channel='발주방';
@@ -218,6 +220,13 @@ function parseSmartSettle(rows,hrow){const m=colmap(rows[hrow]);const acc={};
     const base=N(row[pick(m,['수수료 기준금액'])]);const fee=N(row[pick(m,['수수료금액'])]);
     acc[o]=acc[o]||{base:0,feeSum:0};if(base>acc[o].base)acc[o].base=base;acc[o].feeSum+=fee;}
   return Object.keys(acc).map(o=>({order:o,amt:acc[o].base,fee:Math.abs(acc[o].feeSum),settle:acc[o].base+acc[o].feeSum}));}
+function parseSmartSettle2(rows,hrow){const m=colmap(rows[hrow]);const out=[];
+  for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
+    const spo=String(row[pick(m,['상품주문번호'])]||'');if(!spo)continue;
+    const gu=String(row[pick(m,['구분'])]||'');if(gu.indexOf('배송')>=0)continue;
+    const gross=N(row[pick(m,['정산기준금액'])]);const settle=N(row[pick(m,['정산예정금액'])]);
+    out.push({order:spo,ono:String(row[pick(m,['주문번호'])]||''),amt:gross,fee:Math.abs(gross-settle),settle});}
+  return out;}
 function parseCoupangSettle(rows,hrow){const m=colmap(rows[hrow]);const out=[];
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
     const order=String(row[pick(m,['주문번호'])]||'');if(!order)continue;
@@ -393,7 +402,7 @@ function ingest(name,buf){
  if(channel==='입고'){const inc=parseIpgo(rows,hrow);const r=mergeRecords(DB.ipgo||[],inc,function(x){return [x.date,x.farm,x.conte,x.priceKg].join('|');});DB.ipgo=r.merged;save();logln('✅ <b>입고</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+DB.ipgo.length+'건');render();go('업로드');return;}
  if(channel==='입금'){const inc=parseIpgeum(rows,hrow).map(function(x){return {date:x.date,type:'입금',cat:'입금(업로드)',memo:x.who,amt:x.amt,src:'up'};});const existUp=(DB.cash||[]).filter(function(x){return x.src==='up';});const r=mergeRecords(existUp,inc,function(x){return [x.date,x.memo,x.amt].join('|');});DB.cash=(DB.cash||[]).filter(function(x){return x.src!=='up';}).concat(r.merged);save();logln('✅ <b>입금 업로드</b> ('+name+') · 새 '+r.added+'건 추가, 중복 '+r.updated+'건 제외 → 누적 '+r.merged.length+'건');render();return;}
  if(channel==='발주방'){const a=classifyBalju(normalize('발주방',rows,hrow));DB.balju=a;save();const c={입금완료:0,서비스:0,미수:0};a.forEach(function(x){c[x.status]=(c[x.status]||0)+1;});logln('✅ <b>발주방</b> ('+name+') · 전체 교체 '+a.length+'건 (입금완료 '+c.입금완료+'/서비스 '+c.서비스+'/미수 '+c.미수+')');render();return;}
- if(channel==='쿠팡정산'||channel==='스마트스토어정산'||channel==='토스정산'){normalize(channel,rows,hrow);return;}
+ if(channel==='쿠팡정산'||channel==='스마트스토어정산'||channel==='스마트스토어정산2'||channel==='토스정산'){normalize(channel,rows,hrow);return;}
  const inc=normalize(channel,rows,hrow);const keyFn=function(x){return (x.order||'')+'||'+(x.opt||'');};const arr0=DB.channels[channel]||[];const map=new Map();arr0.forEach(function(x){map.set(keyFn(x),x);});var added=0,updated=0,kept=0;inc.forEach(function(x){const k=keyFn(x);const ex=map.get(k);if(ex){if(ex.fee!=null&&x.fee==null){kept++;}else{map.set(k,x);updated++;}}else{map.set(k,x);added++;}});const merged=Array.from(map.values());DB.channels[channel]=merged;save();const conf=merged.filter(function(x){return x.fee!=null;});const sale=conf.reduce(function(s,x){return s+x.gross;},0);logln('✅ <b>'+channel+'</b> ('+name+') · 새 '+added+'건 / 갱신 '+updated+'건 / 정산확정 유지 '+kept+'건 → 누적 '+merged.length+'건 (확정매출 '+W(sale)+'원)');
 }
 

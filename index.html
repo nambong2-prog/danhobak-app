@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='218';
+<script>window.__BUILD__='219';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -268,7 +268,7 @@ function reset(){if(confirm('모든 데이터를 초기값으로 되돌릴까요
 
 /* ---------- 초기 시드 (기존 엑셀과 동일) ---------- */
 function seed(){
- return {ipgo:[],gongpan:[],gpCostKg:1600,jigeup:[],balju:[],channels:{쿠팡:[],스마트스토어:[],토스:[],톡스토어:[]},ipgeum:[],cash:[],cashOpen:0,seon:0.90};
+ return {ipgo:[],gongpan:[],gpCostKg:1600,jigeup:[],balju:[],channels:{쿠팡:[],스마트스토어:[],토스:[],톡스토어:[]},ipgeum:[],cash:[],cashOpen:0,seon:0.90,assets:[]};
 }
 // 발주방 시드: [날짜,받는분,주문금액,박스kg,박스수,상태]
 const BALJU_SEED=[];
@@ -321,8 +321,9 @@ function agg(){
  const rev=gpNet+baljuSale+chSale;
  const cogs=ipgoCost-stockAsset;
  const jigeup=DB.jigeup.reduce((s,x)=>s+x.amt,0);
+ const assetOther=(DB.assets||[]).reduce((s,x)=>s+N(x.amt),0);
  return {ipgoConte,ipgoKg,ipgoCost,gpKg,gpNet,gpCost,gpMargin,gpMrate,gpCostKg:cKg,gpSettledKg,gpBox,gpAucNet,gpAucBox,gpAucKg,gpDirNet,gpDirBox,gpDirKg,baljuKg,baljuSale,baljuRev,baljuDeposit,baljuOver,baljuUnder,baljuOverList,baljuUnderList,baljuPaidSale,baljuMisu,baljuService,baljuServiceKg,cPaid,cMisu,cSvc,cashIn,cashOut,balance,chs,chKg,chSale,chFee,chPay,chPendAmt,chPendCnt,
-   outKg,outConte,stockConte,stockKg,avgKg,stockAsset,cureKg,sortLoss,cureConte,sortLossConte,lossConte,lossKg,lossRate,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,
+   outKg,outConte,stockConte,stockKg,avgKg,stockAsset,cureKg,sortLoss,cureConte,sortLossConte,lossConte,lossKg,lossRate,rev,cogs,jigeup,mijigeup:ipgoCost-jigeup,assetOther,
    profit:rev-cogs};
 }
 
@@ -580,8 +581,11 @@ const CASH_CAT={입금:['채널정산','계좌입금','현금','기타'],지출:
 function addCash(type){DB.cash=DB.cash||[];DB.cash.push({date:'',type:type,cat:'',memo:'',amt:0});save();render();}
 function setCash(i,f,v){DB.cash[i][f]=(f==='amt')?N(v):v;save();render();}
 function delCash(i){DB.cash.splice(i,1);save();render();}
+function setAsset(i,f,v){DB.assets=DB.assets||[];DB.assets[i][f]=(f==='amt')?N(v):v;save();}
+function addAsset(){DB.assets=DB.assets||[];DB.assets.push({name:'',amt:0});save();render();}
+function delAsset(i){DB.assets.splice(i,1);save();render();}
 function setCashOpen(v){DB.cashOpen=N(v);save();render();}
-function vCash(){const a=agg();const ed=editMode('cash');const cash=DB.cash||[];
+function vCash(){const a=agg();const ed=editMode('cash');const edA=editMode('assets');const cash=DB.cash||[];
  const byCat={};cash.forEach(x=>{if(x.type==='지출')byCat[x.cat||'기타']=(byCat[x.cat||'기타']||0)+(x.amt||0);});
  const catSel=(i,x)=>`<select onchange="setCash(${i},'cat',this.value)" style="width:120px"><option value="">분류선택</option>${(CASH_CAT[x.type]||[]).map(c=>`<option ${x.cat===c?'selected':''}>${c}</option>`).join('')}${x.cat&&!(CASH_CAT[x.type]||[]).includes(x.cat)?`<option selected>${x.cat}</option>`:''}</select>`;
  const typeSel=(i,x)=>`<select onchange="setCash(${i},'type',this.value)" style="width:64px"><option ${x.type==='입금'?'selected':''}>입금</option><option ${x.type==='지출'?'selected':''}>지출</option></select>`;
@@ -613,6 +617,14 @@ function vCash(){const a=agg();const ed=editMode('cash');const cash=DB.cash||[];
 
  <div class="card">${head}${table}
  <div class="note" style="margin-top:10px">광고비·인건비·박스/포장재·택배비·농가지급 등 <b>지출</b>과 채널정산·계좌입금 등 <b>입금</b>을 적으면 잔고가 자동 계산됩니다. 발주방 고객 입금은 엑셀을 [업로드]하면 정리해 드릴게요.</div></div>
+
+ <div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">고정·기타자산 <span class="pill">${(DB.assets||[]).length}건</span></h2>${editBtn('assets')}</div>
+ <div class="scroll"><table><thead><tr><th class="l">항목</th><th>장부가액(원)</th>${edA?'<th></th>':''}</tr></thead><tbody>
+ ${(DB.assets||[]).map((x,i)=>edA?`<tr><td>${inp(x.name,`setAsset(${i},'name',this.value)`,170)}</td><td>${inn(x.amt,`setAsset(${i},'amt',this.value)`,130)}</td><td><button class="btn warn" style="padding:3px 8px" onclick="delAsset(${i})">삭제</button></td></tr>`:`<tr><td class="l">${x.name||'기타자산'}</td><td>${W(N(x.amt))}</td></tr>`).join('')||`<tr><td colspan="${edA?3:2}" class="mut">보증금·차량·기물 등을 [✏ 수정]에서 추가하세요.</td></tr>`}
+ <tr class="tot"><td class="l">합계</td><td>${W(a.assetOther)}</td>${edA?'<td></td>':''}</tr>
+ </tbody></table></div>
+ ${edA?`<button class="btn" style="margin-top:8px" onclick="addAsset()">＋ 자산 추가</button>`:''}
+ <div class="note" style="margin-top:10px">임차보증금·차량·기물(집기·설비) 등 <b>장부가액</b>을 직접 입력합니다. 사업요약 재무상태 자산에 자동 합산돼요.</div></div>
 
  ${cats.length?`<div class="card"><h2>지출 분류별 요약</h2><table><thead><tr><th class="l">분류</th><th>금액(원)</th><th>비중</th></tr></thead><tbody>
  ${cats.map(c=>`<tr><td class="l">${c}</td><td>${W(byCat[c])}</td><td>${a.cashOut?(byCat[c]/a.cashOut*100).toFixed(0):0}%</td></tr>`).join('')}
@@ -668,8 +680,8 @@ function vInvestor(){const a=agg();
  const sga=sgaItems.reduce((s,r)=>s+r[1],0);
  const gross=a.rev-a.cogs;const op=gross-sga;
  const rateG=a.rev?(gross/a.rev*100):0;const rateO=a.rev?(op/a.rev*100):0;
- const aCash=a.balance,aStock=a.stockAsset,aPre=(a.mijigeup<0?-a.mijigeup:0);
- const aTot=aCash+aStock+aPre;const lPay=(a.mijigeup>0?a.mijigeup:0);const lTot=lPay;const eq=aTot-lTot;
+ const aCash=a.balance,aStock=a.stockAsset,aPre=(a.mijigeup<0?-a.mijigeup:0),aFixed=(a.assetOther||0);
+ const aTot=aCash+aStock+aPre+aFixed;const lPay=(a.mijigeup>0?a.mijigeup:0);const lTot=lPay;const eq=aTot-lTot;
  return `<div class="card noprint" style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">사업 요약</h2><button class="btn" onclick="window.print()">📄 PDF로 저장 / 인쇄</button></div>
  <div id="investorReport" class="card">
   <div style="text-align:center;border-bottom:2px solid var(--g);padding-bottom:12px;margin-bottom:18px">
@@ -710,6 +722,7 @@ function vInvestor(){const a=agg();
    <tr><td class="l" style="padding-left:22px;color:#666">현금 잔고</td><td>${W(aCash)}</td></tr>
    <tr><td class="l" style="padding-left:22px;color:#666">재고 자산 (≈${W1(a.stockConte)}콘테나)</td><td>${W(aStock)}</td></tr>
    ${aPre?`<tr><td class="l" style="padding-left:22px;color:#666">농가 선지급금</td><td>${W(aPre)}</td></tr>`:''}
+   ${(DB.assets||[]).map(x=>`<tr><td class="l" style="padding-left:22px;color:#666">${x.name||'기타자산'}</td><td>${W(N(x.amt))}</td></tr>`).join('')}
    <tr class="tot"><td class="l">부채 합계</td><td>${W(lTot)}</td></tr>
    <tr><td class="l" style="padding-left:22px;color:#666">매입채무(농가 미지급)</td><td>${W(lPay)}</td></tr>
    <tr class="tot" style="background:#e9f3ea!important"><td class="l">순자산(자본)</td><td>${W(eq)}</td></tr>

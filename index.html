@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='220';
+<script>window.__BUILD__='221';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -533,6 +533,8 @@ function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup')
 
 function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market'||f==='type')x[f]=v;else if(f==='net'||f==='costKg')x[f]=(v===''?null:N(v));else x[f]=N(v);save();}
 function addGp(t){DB.gongpan.push({date:'',market:'',type:(t||'공판'),boxKg:3,boxes:0,net:null});save();render();}
+function gpFilter(g,k,v){UI.gpf=UI.gpf||{};UI.gpf[g]=UI.gpf[g]||{m:'',mk:''};UI.gpf[g][k]=v;render();}
+function gpReset(g){UI.gpf=UI.gpf||{};UI.gpf[g]={m:'',mk:''};render();}
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
 function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
@@ -560,7 +562,17 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
    <td>${ed?`<button class="btn warn" style="padding:3px 8px" onclick="delGp(${i})">삭제</button>`:''}</td></tr>`;};
  const tot=(list)=>{let net=0,box=0,kg=0,cost=0;list.forEach(({x})=>{const k=(x.boxKg||0)*(x.boxes||0);const rck=(+x.costKg)||cKg;kg+=k;box+=(x.boxes||0);if(x.net!=null){net+=x.net;cost+=k*rck;}});return {net,box,kg,cost,margin:net-cost,mrate:net?(net-cost)/net:0};};
  const THEAD=`<thead><tr><th>거래일</th><th>시장·도매법인</th><th>구분</th><th>규격kg</th><th>박스수</th><th>중량kg</th><th>정산액</th><th>kg당정산</th><th>박스당정산</th><th>원가/kg</th><th>박스당원가</th><th>박스당마진</th><th>행 마진</th><th></th></tr></thead>`;
- const section=(gtype,addLabel,extra)=>{const list=all.filter(o=>rt(o.x)===gtype);const t=tot(list);
+ const _mon=x=>{const mm=String(x.date||'').match(/(\d{1,2})[\/.\-]/);return mm?mm[1]:'';};
+ const section=(gtype,addLabel,extra)=>{const full=all.filter(o=>rt(o.x)===gtype);const f=(UI.gpf&&UI.gpf[gtype])||{m:'',mk:''};
+   const months=[...new Set(full.map(o=>_mon(o.x)).filter(Boolean))].sort((A,B)=>A-B);
+   const markets=[...new Set(full.map(o=>o.x.market).filter(Boolean))];
+   const list=full.filter(o=>(!f.m||_mon(o.x)===f.m)&&(!f.mk||o.x.market===f.mk));const t=tot(list);
+   const fbar=`<div class="row" style="gap:8px;margin:0 0 10px;flex-wrap:wrap;align-items:center">
+     <select onchange="gpFilter('${gtype}','m',this.value)" style="width:96px"><option value="">전체 월</option>${months.map(m=>`<option value="${m}" ${f.m===m?'selected':''}>${m}월</option>`).join('')}</select>
+     <select onchange="gpFilter('${gtype}','mk',this.value)" style="max-width:180px"><option value="">전체 거래처</option>${markets.map(m=>`<option ${f.mk===m?'selected':''}>${m}</option>`).join('')}</select>
+     <button class="btn alt" style="padding:5px 12px" onclick="gpReset('${gtype}')">초기화</button>
+     ${(f.m||f.mk)?`<span class="mut">필터 ${list.length}건 · 정산 ${W(t.net)}원 · 마진 ${W(t.margin)}원</span>`:''}
+   </div>`;
    return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${gtype}</h2>${editBtn('gongpan')}</div>
    <div class="kpis" style="margin:12px 0">
      ${kpi(gtype+' 정산액',W(t.net),'원')}
@@ -569,6 +581,7 @@ function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpa
      ${kpi('마진',W(t.margin),'원 · '+(t.mrate*100).toFixed(1)+'%')}
    </div>
    ${extra||''}
+   ${fbar}
    <div class="scroll"><table>${THEAD}<tbody>
    ${list.map(mkRow).join('')||`<tr><td colspan="14" class="mut">내역이 없습니다. [✏ 수정]에서 추가하세요.</td></tr>`}
    <tr class="tot"><td>합계</td><td></td><td></td><td></td><td>${W(t.box)}</td><td>${W(t.kg)}</td><td>${W(t.net)}</td><td></td><td></td><td></td><td>${W(t.cost)}</td><td></td><td>${sg(t.margin)}</td><td></td></tr>

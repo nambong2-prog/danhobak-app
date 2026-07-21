@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='221';
+<script>window.__BUILD__='222';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -532,13 +532,13 @@ function vIpgo(){const a=agg();const edI=editMode('ipgo'),edJ=editMode('jigeup')
 }
 
 function setGp(i,f,v){const x=DB.gongpan[i];if(f==='date'||f==='market'||f==='type')x[f]=v;else if(f==='net'||f==='costKg')x[f]=(v===''?null:N(v));else x[f]=N(v);save();}
-function addGp(t){DB.gongpan.push({date:'',market:'',type:(t||'공판'),boxKg:3,boxes:0,net:null});save();render();}
+function addGp(t){DB.gongpan.push({date:'',market:'',type:(t||'공판'),boxKg:3,boxes:0,net:null});save();render();const i=DB.gongpan.length-1;const el=document.querySelector(`[onchange*="setGp(${i},'date'"]`);if(el){try{el.scrollIntoView({block:'center'});el.focus();}catch(e){}}}
 function gpFilter(g,k,v){UI.gpf=UI.gpf||{};UI.gpf[g]=UI.gpf[g]||{m:'',mk:''};UI.gpf[g][k]=v;render();}
 function gpReset(g){UI.gpf=UI.gpf||{};UI.gpf[g]={m:'',mk:''};render();}
 function delGp(i){DB.gongpan.splice(i,1);save();render();}
 const sg=v=>v==null?'-':`<span style="color:${v<0?'#c0392b':'#2E5E3A'};font-weight:700">${W(v)}</span>`;
 function vGongpan(){const a=agg();const cKg=a.gpCostKg;const ed=editMode('gongpan');
- const _dk=d=>{const m=String(d||'').match(/(\d{1,2})[\/.\-](\d{1,2})/);return m?(+m[1])*100+(+m[2]):0;};
+ const _dk=d=>{const m=String(d||'').match(/(\d{1,2})[\/.\-](\d{1,2})/);return m?(+m[1])*100+(+m[2]):99999;};
  const rt=x=>x.type||(String(x.market||'').indexOf('올탑')>=0?'도매':'공판');
  const all=DB.gongpan.map((x,i)=>({x,i})).sort((A,B)=>_dk(A.x.date)-_dk(B.x.date));
  const mkRow=({x,i})=>{const kg=(x.boxKg||0)*(x.boxes||0);const gt=rt(x);const rck=(+x.costKg)||cKg;const cost=kg*rck;const pbCost=(x.boxKg||0)*rck;

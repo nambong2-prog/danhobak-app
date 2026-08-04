@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='225';
+<script>window.__BUILD__='226';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -354,23 +354,37 @@ function render(){
 function go(t){TAB=t;render();window.scrollTo(0,0);}
 
 function vDash(){const a=agg();
- return `<div class="card"><h2>핵심 지표</h2><div class="kpis">
-  ${kpi('총 매입',W(a.ipgoConte),'콘테나')}
-  ${kpi('현재고',W1(a.stockConte),'콘테나 (≈'+W(a.stockKg)+'kg)')}
-  ${kpi('총 매출',W(a.rev),'원')}
-  ${kpi('총 수수료',W(a.chFee),'원')}
-  ${kpi('순이익(추정)',W(a.profit),'원')}
-  ${kpi('농가 미지급',W(a.mijigeup),'원')}
+ const rev=a.rev||1;const sojin=a.ipgoKg?(a.outKg/a.ipgoKg*100):0;
+ const Wm=v=>{v=Math.round(Math.abs(v||0));const e=Math.floor(v/100000000);const m=Math.round((v%100000000)/10000);let o='';if(e)o+=e+'억 ';if(m)o+=m.toLocaleString()+'만';if(!o)o=v.toLocaleString()+'원';return o.trim();};
+ const S=v=>(v<0?'−':'')+Wm(v);
+ const fc=(lab,big,sub,dg)=>`<div style="flex:1;min-width:138px;background:${dg?'#fdeaea':'var(--lg)'};border:1px solid ${dg?'#f3c9c9':'var(--bd)'};border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:${dg?'var(--warn)':'var(--mut)'}">${lab}</div><div style="font-size:19px;font-weight:700;color:${dg?'var(--warn)':'var(--ink)'};margin-top:2px">${big}</div><div style="font-size:12px;color:${dg?'var(--warn)':'var(--g2)'};margin-top:3px">${sub}</div></div>`;
+ const ar=`<div style="align-self:center;color:var(--mut)">→</div>`;
+ const sig=(l,v,w)=>`<div class="kpi" style="${w?'background:#fdeaea':''}"><div class="l">${l}</div><div class="v" style="${w?'color:var(--warn);':''}font-size:18px">${v}${w?' ⚠':''}</div></div>`;
+ const chans=[{n:'공판·도매',sale:a.gpNet,fee:0,tag:'<span class="tag warn">마진율 '+(a.gpMrate*100).toFixed(1)+'%</span>'}].concat(CH.map(c=>{const s=a.chs[c];return {n:c,sale:s.sale,fee:s.hasFee?s.fee:0,tag:s.pendCnt?('<span class="tag warn">정산대기 '+s.pendCnt+'건</span>'):(s.sale>0?'<span class="tag ok">확정</span>':'<span class="tag">-</span>')};})).concat([{n:'발주방·공구',sale:a.baljuSale,fee:0,tag:a.cMisu?('<span class="tag warn">미수 '+a.cMisu+'건</span>'):'<span class="tag ok">입금완료</span>'}]).sort((x,y)=>y.sale-x.sale);
+ return `<div class="card"><h2>사업 흐름 <span class="mut" style="font-size:13px;font-weight:400">이번 시즌 누적</span></h2>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+  ${fc('① 매입 · 산 것',Wm(a.ipgoCost),W(a.ipgoConte)+'콘테나 · '+W(a.ipgoKg)+'kg')}
+  ${ar}
+  ${fc('② 판매 · 판 것','매출 '+Wm(a.rev),W(a.outKg)+'kg · 소진율 '+sojin.toFixed(0)+'%')}
+  ${ar}
+  ${fc('③ 재고 · 남은 것',W(a.stockKg)+'kg','≈'+W1(a.stockConte)+'콘테나 · 로스 '+W(a.lossKg)+'kg')}
+  ${ar}
+  ${fc('순이익 (추정)',S(a.profit),'재고·부대비용 미반영',a.profit<0)}
  </div></div>
- <div class="card"><h2>채널별 요약</h2>
- <table><thead><tr><th class="l">채널</th><th>건수</th><th>판매중량(kg)</th><th>콘테나</th><th>매출(원)</th><th>수수료(원)</th><th>정산(원)</th></tr></thead><tbody>
- <tr><td class="l">공판(도매)</td><td>${DB.gongpan.length}</td><td>${W(a.gpKg)}</td><td>${W1(a.gpKg/KGU)}</td><td>${W(a.gpNet)}</td><td>-</td><td>${W(a.gpNet)}</td></tr>
- <tr><td class="l">발주방</td><td>${DB.balju.length}</td><td>${W(a.baljuKg)}</td><td>${W1(a.baljuKg/KGU)}</td><td>${W(a.baljuSale)}</td><td>-</td><td>${W(a.baljuSale)}</td></tr>
- ${CH.map(c=>{const s=a.chs[c];return `<tr><td class="l">${c}${s.pendCnt?'<span class="tag warn">정산대기 '+s.pendCnt+'건</span>':''}</td><td>${s.cnt}</td><td>${W(s.kg)}</td><td>${W1(s.conte)}</td><td>${W(s.sale)}</td><td>${s.hasFee?W(s.fee):'-'}</td><td>${s.hasFee?W(s.pay):'-'}</td></tr>`}).join('')}
- <tr class="tot"><td class="l">합계</td><td></td><td>${W(a.outKg)}</td><td>${W1(a.outConte)}</td><td>${W(a.rev)}</td><td>${W(a.chFee)}</td><td>${W(a.gpNet+a.baljuSale+a.chPay)}</td></tr>
- </tbody></table>
- <p class="mut">발주방: 입금완료 ${a.cPaid}건·${W(a.baljuPaidSale)}원 · <b style="color:#c0392b">미수 ${a.cMisu}건·${W(a.baljuMisu)}원</b> · 서비스(무료) ${a.cSvc}건·${W(a.baljuServiceKg)}kg(정가 ${W(a.baljuService)}원). 발주방 매출은 <b>실제 입금액 ${W(a.baljuDeposit)}원</b> 기준입니다.</p>
- <p class="mut">※ 주문만 들어온 채널(쿠팡·토스 등)은 정산 전이라 <b>'정산대기'</b>로 매출에 미반영됩니다(현재 정산대기 ${a.chPendCnt}건·주문액 ${W(a.chPendAmt)}원). 정산서를 올리면 매출로 확정돼요.</p></div>`;
+ <div class="card"><h2>판단 신호등</h2><div class="kpis">
+  ${sig('소진율',sojin.toFixed(0)+'%',sojin<50)}
+  ${sig('공판 마진율',(a.gpMrate*100).toFixed(1)+'%',a.gpMrate<0.05)}
+  ${sig('정산대기',W(a.chPendCnt)+'건',a.chPendCnt>0)}
+  ${sig('통장 잔고',a.balance?W(a.balance)+'원':'미입력',!a.balance)}
+  ${sig('농가 미지급',Wm(a.mijigeup),false)}
+ </div></div>
+ <div class="card"><h2>채널별 성과</h2>
+ <div class="scroll"><table><thead><tr><th class="l">채널</th><th>매출</th><th>비중</th><th>수수료</th><th>상태</th></tr></thead><tbody>
+ ${chans.map(c=>`<tr><td class="l">${c.n}<div style="height:6px;border-radius:4px;background:var(--g);opacity:.8;width:${Math.max(2,c.sale/rev*100).toFixed(1)}%;margin-top:5px"></div></td><td>${Wm(c.sale)}</td><td>${(c.sale/rev*100).toFixed(1)}%</td><td>${c.fee?W(c.fee):'-'}</td><td>${c.tag}</td></tr>`).join('')}
+ <tr class="tot"><td class="l">합계</td><td>${Wm(a.rev)}</td><td>100%</td><td>${W(a.chFee)}</td><td></td></tr>
+ </tbody></table></div>
+ <p class="mut" style="margin-top:10px">발주방 매출은 <b>실제 입금액 ${W(a.baljuDeposit)}원</b> 기준(입금완료 ${a.cPaid}건 · 미수 ${a.cMisu}건·${W(a.baljuMisu)}원 · 서비스 ${a.cSvc}건).</p>
+ <p class="mut">주문만 들어온 채널은 <b>정산대기</b>로 매출 미반영(현재 ${a.chPendCnt}건·주문액 ${W(a.chPendAmt)}원). 정산서를 올리면 확정됩니다. 상세 손익·재무는 <b>사업요약</b> 탭(경영보고·PDF)에서 보세요.</p></div>`;
 }
 const kpi=(l,v,u)=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="u">${u}</div></div>`;
 

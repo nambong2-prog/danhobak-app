@@ -80,7 +80,7 @@ input[type=number],input[type=text]{border:1px solid var(--bd);border-radius:6px
 </header>
 <div class="wrap" id="app"></div>
 
-<script>window.__BUILD__='226';
+<script>window.__BUILD__='228';
 const KGU=19, FONT_OK="ok";
 const W=v=>v==null||v===''?'-':Math.round(v).toLocaleString();
 const W1=v=>v==null?'-':(Math.round(v*10)/10).toLocaleString();
@@ -133,6 +133,7 @@ function normalize(channel, rows, hrow){
     const c0=String(row[0]||'');
     if(c0.startsWith('수정 ')||c0.startsWith('◈')||c0.startsWith('📍'))continue; // 안내/주석행
     let rec={channel};
+    if((channel==='쿠팡'||channel==='스마트스토어'||channel==='토스'||channel==='톡스토어')&&String(get(row,['상품명','노출상품명(옵션명)','등록상품명','상품명(옵션명)'])||'').indexOf('청귤')>=0)continue;
     if(channel==='쿠팡'){
       rec.date=getNE(row,['출고일(발송일)','주문일']); rec.order=get(row,['주문번호']);
       rec.opt=get(row,['등록옵션명','노출상품명(옵션명)']); rec.qty=N(get(row,['구매수(수량)']))||1;
@@ -211,13 +212,13 @@ function parseIpgeum(rows,hrow){const m=colmap(rows[hrow]);const out=[];
 function parseTossSettle(rows,hrow){const m=colmap(rows[hrow]);const out=[];
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
     const spo=String(row[pick(m,['상품 주문번호','상품주문번호'])]||'');const nm=String(row[pick(m,['상품명'])]||'');
-    if(!spo||spo==='0'||nm==='배송비')continue;
+    if(!spo||spo==='0'||nm==='배송비'||nm.indexOf('청귤')>=0)continue;
     const opt=String(row[pick(m,['옵션명'])]||'');const bkm=opt.match(/(\d+(?:\.\d+)?)\s*kg/i);const boxKg=bkm?parseFloat(bkm[1]):0;const qm=opt.match(/(\d+)\s*개/);const qty=qm?+qm[1]:1;const date=fmtDate(row[pick(m,['구매확정일','결제일시'])]);
     out.push({ono:String(row[pick(m,['주문번호'])]||''),spo,opt,boxKg,qty,kg:boxKg*qty,date,amt:N(row[pick(m,['주문금액 합계','판매가격'])]),fee:Math.abs(N(row[pick(m,['수수료 합계'])])),settle:N(row[pick(m,['정산금액'])])});}
   return out;}
 function parseSmartSettle(rows,hrow){const m=colmap(rows[hrow]);const acc={};
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
-    const o=String(row[pick(m,['상품주문번호'])]||'');if(!o)continue;
+    const o=String(row[pick(m,['상품주문번호'])]||'');const nm=String(row[pick(m,['상품명'])]||'');if(!o||nm.indexOf('청귤')>=0)continue;
     const base=N(row[pick(m,['수수료 기준금액'])]);const fee=N(row[pick(m,['수수료금액'])]);
     acc[o]=acc[o]||{base:0,feeSum:0,ono:'',date:''};if(base>acc[o].base)acc[o].base=base;acc[o].feeSum+=fee;
     if(!acc[o].ono)acc[o].ono=String(row[pick(m,['주문번호'])]||'');
@@ -226,13 +227,13 @@ function parseSmartSettle(rows,hrow){const m=colmap(rows[hrow]);const acc={};
 function parseSmartSettle2(rows,hrow){const m=colmap(rows[hrow]);const out=[];
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
     const spo=String(row[pick(m,['상품주문번호'])]||'');if(!spo)continue;
-    const gu=String(row[pick(m,['구분'])]||'');if(gu.indexOf('배송')>=0)continue;
+    const gu=String(row[pick(m,['구분'])]||'');const nm=String(row[pick(m,['상품명'])]||'');if(gu.indexOf('배송')>=0||nm.indexOf('청귤')>=0)continue;
     const gross=N(row[pick(m,['정산기준금액'])]);const settle=N(row[pick(m,['정산예정금액'])]);
     out.push({order:spo,ono:String(row[pick(m,['주문번호'])]||''),date:fmtDate(row[pick(m,['결제일','정산기준일'])]),amt:gross,fee:Math.abs(gross-settle),settle});}
   return out;}
 function parseCoupangSettle(rows,hrow){const m=colmap(rows[hrow]);const out=[];
   for(let r=hrow+1;r<rows.length;r++){const row=rows[r];if(!row||row.every(c=>c==null||c===''))continue;
-    const order=String(row[pick(m,['주문번호'])]||'');if(!order)continue;
+    const order=String(row[pick(m,['주문번호'])]||'');const nm=String(row[pick(m,['상품명','노출상품명(옵션명)'])]||'');if(!order||nm.indexOf('청귤')>=0)continue;
     const optId=String(row[pick(m,['옵션 ID'])]||'');if(optId.charAt(0)==='<')continue;
     out.push({order,amt:N(row[pick(m,['판매액'])]),fee:N(row[pick(m,['판매수수료'])]),settle:N(row[pick(m,['정산금액'])]),qty:N(row[pick(m,['판매수량'])])||1});}
   return out;}
@@ -252,15 +253,30 @@ function ghReady(){return GH.owner&&GH.repo&&GH.token;}
 async function ghGetSha(){const r=await fetch(ghUrl()+`?ref=${GH.branch||'main'}&t=`+Date.now(),{headers:ghHdr()});if(r.status===200){return (await r.json()).sha;}return null;}
 async function ghPush(){if(!ghReady()){ghStatus('⚠️ 아이디·저장소·토큰을 먼저 입력하세요.');return;}
  try{ghStatus('저장 중…');const sha=await ghGetSha();
+  /* 다른 기기가 먼저 저장했으면 덮어쓰기 전에 한 번 물어봅니다 (자료 유실 방지) */
+  if(sha&&GH.lastSha&&sha!==GH.lastSha){
+   if(!confirm('다른 기기에서 저장한 내용이 GitHub에 있습니다.\n지금 이 화면의 자료로 덮어쓰면 그 내용이 사라집니다.\n\n덮어쓸까요?\n(취소 → [⬇ GitHub에서 불러오기]를 먼저 누르세요)')){
+    ghStatus('⏸ 저장을 취소했습니다. [⬇ 불러오기]로 최신본을 먼저 받으세요.');return;}
+  }
   const body={message:'update '+new Date().toISOString(),content:b64enc(JSON.stringify(DB)),branch:GH.branch||'main'};if(sha)body.sha=sha;
   const r=await fetch(ghUrl(),{method:'PUT',headers:ghHdr(),body:JSON.stringify(body)});
-  if(r.ok)ghStatus('✅ GitHub 저장 완료 · '+new Date().toLocaleString());
+  if(r.ok){const j=await r.json();if(j&&j.content&&j.content.sha){GH.lastSha=j.content.sha;ghSaveCfg();}ghStatus('✅ GitHub 저장 완료 · '+new Date().toLocaleString()+' · '+ghCount());}
   else{const e=await r.json();ghStatus('❌ 저장 실패: '+(e.message||r.status));}}catch(e){ghStatus('❌ '+e.message+' (file:// 이면 Pages 주소로 여세요)');}}
+function ghCount(){try{const c=DB.channels||{};const n=Object.keys(c).reduce((s,k)=>s+(c[k]||[]).length,0);return '주문 '+n.toLocaleString()+'건 · '+Math.round(JSON.stringify(DB).length/1024).toLocaleString()+'KB';}catch(e){return '';}}
 async function ghPull(){if(!ghReady()){ghStatus('⚠️ 아이디·저장소·토큰을 먼저 입력하세요.');return;}
- try{ghStatus('불러오는 중…');const r=await fetch(ghUrl()+`?ref=${GH.branch||'main'}&t=`+Date.now(),{headers:ghHdr()});
+ try{ghStatus('불러오는 중…');
+  /* raw 헤더로 받아야 1MB 넘는 파일도 읽힙니다. base64 응답은 1MB 초과 시 빈 값으로 옵니다. */
+  const h=Object.assign({},ghHdr(),{Accept:'application/vnd.github.raw'});
+  const r=await fetch(ghUrl()+`?ref=${GH.branch||'main'}&t=`+Date.now(),{headers:h});
   if(r.status===404){ghStatus('⚠️ 파일이 없습니다. [GitHub에 저장]을 먼저 누르세요.');return;}
-  if(!r.ok){const e=await r.json();ghStatus('❌ 불러오기 실패: '+(e.message||r.status));return;}
-  const j=await r.json();_ghLoading=true;DB=JSON.parse(b64dec(j.content.replace(/\n/g,'')));save();_ghLoading=false;render();ghStatus('✅ GitHub에서 불러왔습니다 · '+new Date().toLocaleString());}catch(e){ghStatus('❌ '+e.message);}}
+  if(!r.ok){let m=r.status;try{m=(await r.json()).message||m;}catch(e2){}ghStatus('❌ 불러오기 실패: '+m);return;}
+  const txt=await r.text();
+  if(!txt.trim()){ghStatus('❌ 받아온 내용이 비어 있습니다. 기존 자료를 그대로 둡니다.');return;}
+  let next;try{next=JSON.parse(txt);}catch(e3){ghStatus('❌ 파일 형식 오류. 기존 자료를 그대로 둡니다.');return;}
+  if(!next||!next.channels){ghStatus('❌ 형식이 올바르지 않습니다. 기존 자료를 그대로 둡니다.');return;}
+  _ghLoading=true;DB=next;save();_ghLoading=false;
+  GH.lastSha=await ghGetSha();ghSaveCfg();
+  render();ghStatus('✅ GitHub에서 불러왔습니다 · '+new Date().toLocaleString()+' · '+ghCount());}catch(e){ghStatus('❌ '+e.message);}}
 let _ghT=null,_ghLoading=false;
 function scheduleGhPush(){if(_ghLoading||!ghReady()||GH.auto===false)return;clearTimeout(_ghT);_ghT=setTimeout(ghPush,3000);}
 let DB;
@@ -347,7 +363,7 @@ function render(){
  document.getElementById('app').innerHTML=({
    '대시보드':vDash,'업로드':vUpload,'채널 정산':vChannels,'입고·매입':vIpgo,'공판':vGongpan,'자금현황':vCash,'재고':vStock,'손익':vPnl,'사업요약':vInvestor,'동기화':vSync
  })[TAB]();
- if(TAB==='업로드')bindDrop();
+ if(TAB==='업로드'){bindDrop();purgeStat();}
  numberTitles();
  window.scrollTo(0,_sy);
 }
@@ -396,6 +412,83 @@ function vUpload(){return `<div class="card"><h2>파일 업로드 <span class="p
  <button class="btn warn" onclick="reset()">초기화</button></div>
  <h3>처리 로그</h3><div id="log" class="log">${LOGS.length?LOGS.map(function(h){return '<div>'+h+'</div>';}).join(''):'<div class="mut">대기 중…</div>'}</div>
  <div class="note" style="margin-top:12px"><b>쿠팡·스마트스토어·토스·톡스토어</b>는 올릴 때마다 <b>누적</b>(같은 주문 중복 자동제거)됩니다. <b>발주방</b>은 올린 CSV로 <b>전체 교체</b>되니, 항상 시트에서 받은 <b>전체 발주방 CSV</b>를 올리세요(빠진 건 사라지고 추가·변경분이 그대로 반영).</div>
+ </div>`+vPurge();}
+
+/* ---------- 품목 정리 (청귤 등 단호박 외 품목 제외) ---------- */
+var PURGE_SEL=null, PURGE_ROWS=[];
+const pesc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const PURGE_NOOPT='(옵션없음 · 정산서로 생성된 건)';
+function purgeKeyOf(x){const o=String(x.opt||'').trim();return o||PURGE_NOOPT;}
+function purgeGroups(){
+ const g={};
+ CH.forEach(function(ch){
+  (DB.channels[ch]||[]).forEach(function(x){
+   const opt=purgeKeyOf(x), k=ch+'::'+opt;
+   if(!g[k])g[k]={key:k,ch:ch,opt:opt,cnt:0,amt:0};
+   g[k].cnt++; g[k].amt+=(x.payout!=null?x.payout:(x.gross||0));
+  });
+ });
+ return Object.keys(g).sort().map(function(k){return g[k];});
+}
+function purgeInit(rows){
+ if(PURGE_SEL)return;
+ PURGE_SEL={};
+ rows.forEach(function(r){if(r.opt.indexOf('청귤')>=0)PURGE_SEL[r.key]=1;});
+}
+function purgeToggle(i,on){
+ const r=PURGE_ROWS[i]; if(!r)return;
+ if(on)PURGE_SEL[r.key]=1; else delete PURGE_SEL[r.key];
+ purgeStat();
+}
+function purgeStat(){
+ let cnt=0,amt=0,n=0;
+ PURGE_ROWS.forEach(function(r){if(PURGE_SEL[r.key]){n++;cnt+=r.cnt;amt+=r.amt;}});
+ const el=document.getElementById('purgeStat');
+ if(el)el.innerHTML=n?('선택 <b>'+n+'</b>개 품목 · <b>'+cnt+'</b>건 · 매출 <b>'+Math.round(amt).toLocaleString()+'</b>원 삭제 예정'):'선택된 품목이 없습니다.';
+}
+function purgeRun(){
+ let cnt=0,n=0;
+ PURGE_ROWS.forEach(function(r){if(PURGE_SEL[r.key]){n++;cnt+=r.cnt;}});
+ if(!n){logln('⚠️ 삭제할 품목을 먼저 체크하세요.');render();return;}
+ if(!confirm('선택한 '+n+'개 품목 · 총 '+cnt+'건의 주문내역을 삭제합니다.\n되돌릴 수 없습니다. 먼저 [통합 엑셀 내보내기(백업)]을 받아두세요.\n\n계속할까요?'))return;
+ const byCh={}; let removed=0;
+ CH.forEach(function(ch){
+  const arr=DB.channels[ch]||[];
+  DB.channels[ch]=arr.filter(function(x){
+   const hit=!!PURGE_SEL[ch+'::'+purgeKeyOf(x)];
+   if(hit){removed++;byCh[ch]=(byCh[ch]||0)+1;}
+   return !hit;
+  });
+ });
+ PURGE_SEL=null; save();
+ logln('🍊 <b>품목 정리 완료</b> · 총 '+removed+'건 삭제 ('+Object.keys(byCh).map(function(c){return c+' '+byCh[c]+'건';}).join(' / ')+')');
+ render();
+}
+function purgeAll(on){
+ PURGE_ROWS.forEach(function(r){if(on)PURGE_SEL[r.key]=1;else delete PURGE_SEL[r.key];});
+ render();
+}
+function vPurge(){
+ PURGE_ROWS=purgeGroups();
+ if(!PURGE_ROWS.length)return '';
+ purgeInit(PURGE_ROWS);
+ const body=PURGE_ROWS.map(function(r,i){
+  const on=!!PURGE_SEL[r.key];
+  return '<tr'+(on?' style="background:rgba(220,80,60,.10)"':'')+'>'
+   +'<td class="l"><label style="display:flex;gap:8px;align-items:center;cursor:pointer">'
+   +'<input type="checkbox" '+(on?'checked':'')+' onchange="purgeToggle('+i+',this.checked)">'
+   +'<span>'+pesc(r.opt)+'</span></label></td>'
+   +'<td>'+pesc(r.ch)+'</td><td>'+r.cnt+'건</td><td>'+Math.round(r.amt).toLocaleString()+'원</td></tr>';
+ }).join('');
+ return `<div class="card"><h2>품목 정리 <span class="pill">단호박 외 품목 제외</span></h2>
+ <p class="mut">채널에 쌓인 주문을 <b>옵션명 기준</b>으로 묶어 보여줍니다. 단호박이 아닌 품목(청귤 등)을 체크해서 삭제하면 매출·손익·대시보드에서 모두 빠집니다. 이름에 <b>청귤</b>이 들어간 품목은 미리 체크해 뒀습니다.</p>
+ <div class="row" style="margin:10px 0"><button class="btn alt" style="padding:5px 12px" onclick="purgeAll(true)">전체 선택</button>
+ <button class="btn alt" style="padding:5px 12px" onclick="purgeAll(false)">전체 해제</button></div>
+ <div class="scroll"><table><thead><tr><th class="l">옵션명(품목)</th><th>채널</th><th>건수</th><th>매출</th></tr></thead><tbody>${body}</tbody></table></div>
+ <p id="purgeStat" class="mut" style="margin-top:10px"></p>
+ <div class="row" style="margin-top:10px"><button class="btn alt" onclick="exportXlsx()">⬇ 먼저 백업 받기</button>
+ <button class="btn warn" onclick="purgeRun()">🗑 체크한 품목 삭제</button></div>
+ <div class="note" style="margin-top:12px">앞으로 올리는 엑셀은 <b>상품명에 청귤이 들어간 행을 자동으로 걸러</b> 넣습니다. 이 표는 <b>필터가 생기기 전에 이미 들어온 데이터</b>를 지우는 용도입니다. 정산서로만 생성된 건은 옵션명이 비어 있어 <b>${PURGE_NOOPT}</b>로 묶입니다 — 여기엔 단호박도 섞여 있을 수 있으니 통째로 지우지 마세요.</div>
  </div>`;}
 
 function bindDrop(){
